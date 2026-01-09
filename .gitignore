@@ -1,37 +1,38 @@
-HELP.md
-target/
-.mvn/wrapper/maven-wrapper.jar
+# Maven / Spring Boot
+/target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
+# Spring Boot secrets
+src/main/resources/application.properties
+.env
 
-### IntelliJ IDEA ###
-.idea
-*.iws
+# Compiled class files
+*.class
+
+# Logs
+*.log
+
+# IDEs
+.idea/
 *.iml
 *.ipr
+*.iws
+.classpath
+.project
+.settings/
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
+# OS
+.DS_Store
 
-### VS Code ###
-.vscode/
+# Java packages
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
 
-# Spring Boot config (contains secrets)
-src/main/resources/application.properties
-
+# JVM crash logs
+hs_err_pid*
+replay_pid*
