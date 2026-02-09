@@ -1,6 +1,8 @@
 package com.springai.aibuisnessadvisor.Model;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -65,6 +67,8 @@ public class Business {
     /**
      * All metric snapshots for this business
      */
+    //@JsonIgnore
+    @JsonManagedReference
     @OneToMany(
             mappedBy = "business",
             cascade = CascadeType.ALL,

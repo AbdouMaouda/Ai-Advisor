@@ -1,5 +1,6 @@
 package com.springai.aibuisnessadvisor.Model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -7,16 +8,20 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-
-
-
-//Class that has all the BusinessData
-
 
 @Entity
-@Table(name = "business_metrics")
+@Table(
+        name = "business_metrics",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        columnNames = {"business_id", "start_date", "end_date", "platform_type"}
+                )
+        },
+        indexes = {
+                @Index(name = "idx_business_end_date", columnList = "business_id, end_date DESC"),
+                @Index(name = "idx_business_platform_end_date", columnList = "business_id, platform_type, end_date DESC")
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -24,37 +29,34 @@ public class BusinessMetrics {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id; // snapshot ID
+    private Long id;
 
-    /**
-     * Business this snapshot belongs to
-     */
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "business_id", nullable = false)
+    @JsonIgnore
     private Business business;
-    /**
-     * Metrics time window
-     */
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "platform_type", nullable = false)
+    private PlatformType platformType;
+
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
-    /**
-     * When metrics were calculated
-     */
     @Column(name = "collected_at", nullable = false)
     private Instant collectedAt;
 
-    /**
-     * Embedded metrics (value objects)
-     */
     @Embedded
     private CustomerMetrics customerMetrics;
 
     @Embedded
     private RevenueMetrics revenueMetrics;
+
+    @Embedded
+    private RefundMetrics refundMetrics;
 
     @Embedded
     private SubscriptionMetrics subscriptionMetrics;
@@ -63,22 +65,8 @@ public class BusinessMetrics {
     private InvoiceMetrics invoiceMetrics;
 
     @Embedded
-    private RefundMetrics refundMetrics;
-
-    /*
-   @Embedded
     private GrowthMetrics growthMetrics;
-*/
+
     @Embedded
     private HealthMetrics healthMetrics;
-
-    /**
-     * Product performance is the only real child entity
-     */
-    @OneToMany(
-            mappedBy = "businessMetrics",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
-    )
-    private List<ProductPerformance> productPerformance = new ArrayList<>();
 }

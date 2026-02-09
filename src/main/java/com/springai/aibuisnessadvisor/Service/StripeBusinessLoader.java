@@ -33,7 +33,7 @@ public class StripeBusinessLoader implements CommandLineRunner {
                 businessRepository.save(business);
 
                 System.out.println("========================================");
-                System.out.println("✅ Business created from Stripe account!");
+                System.out.println(" Business created from Stripe account!");
                 System.out.println("Business ID: " + business.getId());
                 System.out.println("Name: " + business.getBusinessName());
                 System.out.println("Email: " + business.getEmail());

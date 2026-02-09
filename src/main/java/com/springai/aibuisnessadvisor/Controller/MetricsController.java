@@ -5,6 +5,7 @@ package com.springai.aibuisnessadvisor.Controller;
 import com.springai.aibuisnessadvisor.Model.*;
 import com.springai.aibuisnessadvisor.Service.Metrics.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.graphql.ConditionalOnGraphQlSchema;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

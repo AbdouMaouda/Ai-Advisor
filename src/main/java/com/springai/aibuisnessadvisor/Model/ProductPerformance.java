@@ -1,5 +1,6 @@
 package com.springai.aibuisnessadvisor.Model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,6 +22,7 @@ public class ProductPerformance implements Comparable<ProductPerformance> {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "business_metrics_id", nullable = false)
+    @JsonBackReference
     private BusinessMetrics businessMetrics;
 
     @Column(name = "product_id", nullable = false)
@@ -44,6 +46,9 @@ public class ProductPerformance implements Comparable<ProductPerformance> {
 
     @Column(name = "revenue_growth", precision = 10, scale = 4)
     private BigDecimal revenueGrowth = BigDecimal.ZERO;
+
+    @Column(name = "number_of_customers")
+    private Integer numberOfCustomers = 0;
 
     @Override
     public int compareTo(ProductPerformance other) {

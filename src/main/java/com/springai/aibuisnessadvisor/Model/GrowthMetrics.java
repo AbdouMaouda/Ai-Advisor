@@ -20,7 +20,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 public class GrowthMetrics {
     @Column(name = "previous_gross_revenue", precision = 19, scale = 2)
-    private BigDecimal previousGrossRevenue = BigDecimal.ZERO;//Revenue of last period,last 7 days,last month...
+    private BigDecimal previousGrossRevenue = BigDecimal.ZERO; //Revenue of last period,last 7 days,last month...
 
     @Column(name = "previous_net_revenue", precision = 19, scale = 2)
     private BigDecimal previousNetRevenue = BigDecimal.ZERO;
