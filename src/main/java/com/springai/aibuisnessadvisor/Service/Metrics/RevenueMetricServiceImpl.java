@@ -10,179 +10,262 @@ import com.stripe.model.Refund;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.InvoiceListParams;
 import com.stripe.param.RefundListParams;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Instant;
+import java.time.*;
 import java.time.temporal.ChronoUnit;
 
 @Service
+@RequiredArgsConstructor
 public class RevenueMetricServiceImpl implements RevenueMetricsService {
 
+    private final BusinessRepository businessRepository;
 
     @Value("${app.mode}")
     private String appMode;
 
-    @Autowired
-    BusinessRepository businessRepository;
+    // Default business timezone (VERY IMPORTANT for SaaS analytics)
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("America/Toronto");
 
     @Override
-    public RevenueMetrics computeRevenueMetrics(Long businessId, Instant start, Instant end, PlatformType platformType) {
+    public RevenueMetrics computeRevenueMetrics(
+            Long businessId,
+            Instant start,
+            Instant end,
+            PlatformType platformType
+    ) {
+
+        System.out.println("\n=========== STRIPE REVENUE METRICS DEBUG ===========");
+        System.out.println("Business ID: " + businessId);
+        System.out.println("Platform: " + platformType);
+        System.out.println("Raw Start (UTC): " + start);
+        System.out.println("Raw End (UTC): " + end);
+
         RequestOptions requestOptions = buildRequestOptions(businessId);
 
-        BigDecimal grossRevenue = computeGrossRevenue(requestOptions, start, end);
-        BigDecimal refundedAmount = computeRefundedAmount(requestOptions, start, end);
-        Long successfulCharges = countPaidInvoices(requestOptions, start, end);
-        Long failedCharges = countFailedInvoices(requestOptions, start, end);
-        BigDecimal netRevenue = null;
-        if (grossRevenue != null) {
-            netRevenue = grossRevenue.subtract(refundedAmount);
-        }
-        BigDecimal AverageTransactionValue = BigDecimal.ZERO;
-        if (grossRevenue != null) {
-            AverageTransactionValue = computeAverageTransactionValue(grossRevenue, successfulCharges);
+        // 🔥 Convert to BUSINESS LOCAL DAY WINDOW (fixes your main bug)
+        Instant correctedStart = toBusinessStartOfDay(start);
+        Instant correctedEnd = toBusinessEndOfDay(end);
 
-        }
-        BigDecimal AverageDailyRevenue = computeAverageDailyRevenue(grossRevenue, start, end);
+        System.out.println("Corrected Start (Business TZ): " + correctedStart);
+        System.out.println("Corrected End (Business TZ): " + correctedEnd);
+
+        BigDecimal grossRevenue = computeGrossRevenue(requestOptions, correctedStart, correctedEnd);
+        BigDecimal refundedAmount = computeRefundedAmount(requestOptions, correctedStart, correctedEnd);
+        Long successfulCharges = countPaidInvoices(requestOptions, correctedStart, correctedEnd);
+        Long failedCharges = countFailedInvoices(requestOptions, correctedStart, correctedEnd);
+
+        BigDecimal netRevenue = grossRevenue.subtract(refundedAmount);
+
+        BigDecimal averageTransactionValue = computeAverageTransactionValue(
+                grossRevenue,
+                successfulCharges
+        );
+
+        BigDecimal averageDailyRevenue = computeAverageDailyRevenue(
+                grossRevenue,
+                correctedStart,
+                correctedEnd
+        );
 
         RevenueMetrics metrics = new RevenueMetrics();
-
-
         metrics.setGrossRevenue(grossRevenue);
         metrics.setRefundedAmount(refundedAmount);
         metrics.setNetRevenue(netRevenue);
         metrics.setSuccessfulCharges(successfulCharges);
         metrics.setFailedCharges(failedCharges);
+        metrics.setAverageTransactionValue(averageTransactionValue);
+        metrics.setAverageDailyRevenue(averageDailyRevenue);
 
-        metrics.setAverageTransactionValue(
-                AverageTransactionValue
-        );
-
-        metrics.setAverageDailyRevenue(
-                AverageDailyRevenue);
+        System.out.println("\n--- FINAL REVENUE METRICS ---");
+        System.out.println("Gross Revenue: " + grossRevenue);
+        System.out.println("Refunded Amount: " + refundedAmount);
+        System.out.println("Net Revenue: " + netRevenue);
+        System.out.println("Successful Charges: " + successfulCharges);
+        System.out.println("Failed Charges: " + failedCharges);
+        System.out.println("=============================================\n");
 
         return metrics;
     }
 
-    private BigDecimal computeGrossRevenue(RequestOptions requestOptions, Instant start, Instant end) {
+    /**
+     * 🔥 CRITICAL: Use PAID_AT instead of CREATED
+     * This matches real SaaS analytics (Stripe, Baremetrics, ChartMogul)
+     */
+    private BigDecimal computeGrossRevenue(
+            RequestOptions requestOptions,
+            Instant start,
+            Instant end
+    ) {
 
-
-        InvoiceListParams invoiceListParams = InvoiceListParams.builder()
-                .setStatus(InvoiceListParams.Status.PAID)
-                .setCreated(
-                        InvoiceListParams.Created.builder()
-                                .setGte(start.getEpochSecond())
-                                .setLte(end.getEpochSecond())
-                                .build()
-                )
-                .setLimit(100L)
-                .build();
+        System.out.println("=== REVENUE DEBUG: FETCHING ALL INVOICES (PAID_AT FILTER) ===");
 
         BigDecimal grossRevenue = BigDecimal.ZERO;
+        long startSec = start.getEpochSecond();
+        long endSec = end.getEpochSecond();
+
+        InvoiceListParams params = InvoiceListParams.builder()
+                .setLimit(100L) // DO NOT filter by created
+                .build();
 
         try {
-            for (Invoice invoice : Invoice.list(invoiceListParams, requestOptions).autoPagingIterable()) {
-                BigDecimal amount = BigDecimal.valueOf(invoice.getAmountPaid())
-                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            for (Invoice invoice : Invoice.list(params, requestOptions).autoPagingIterable()) {
 
-                grossRevenue = grossRevenue.add(amount);
+                System.out.println("\nInvoice ID: " + invoice.getId());
+                System.out.println("Status: " + invoice.getStatus());
+
+                if (!"paid".equalsIgnoreCase(invoice.getStatus())) {
+                    System.out.println("Skipped (not paid)");
+                    continue;
+                }
+
+                if (invoice.getStatusTransitions() == null ||
+                        invoice.getStatusTransitions().getPaidAt() == null) {
+                    System.out.println("Skipped (no paid_at timestamp)");
+                    continue;
+                }
+
+                long paidAt = invoice.getStatusTransitions().getPaidAt();
+                Instant paidInstant = Instant.ofEpochSecond(paidAt);
+
+                System.out.println("PaidAt (UTC): " + paidInstant);
+
+                // 🔥 Correct filtering (by payment time, not creation)
+                if (paidAt >= startSec && paidAt <= endSec) {
+
+                    Long amountPaid = invoice.getAmountPaid();
+                    if (amountPaid == null) {
+                        System.out.println("Skipped (amountPaid null)");
+                        continue;
+                    }
+
+                    BigDecimal amount = BigDecimal.valueOf(amountPaid)
+                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+                    grossRevenue = grossRevenue.add(amount);
+
+                    System.out.println("COUNTED REVENUE: " + amount);
+                    System.out.println("Running Gross Revenue: " + grossRevenue);
+                } else {
+                    System.out.println("Skipped (outside business day window)");
+                }
             }
-            return grossRevenue;
+
+            System.out.println("[REVENUE] FINAL GROSS REVENUE: " + grossRevenue);
+            return grossRevenue.setScale(2, RoundingMode.HALF_UP);
 
         } catch (StripeException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to compute gross revenue", e);
         }
-
-
     }
 
-    private BigDecimal computeRefundedAmount(RequestOptions requestOptions, Instant start, Instant end) {
-
-        RefundListParams refundListParams = RefundListParams.builder()
-                .setCreated(
-                        RefundListParams.Created.builder()
-                                .setGte(start.getEpochSecond())
-                                .setLte(end.getEpochSecond())
-                                .build()
-                )
-                .setLimit(100L)
-                .build();
+    private BigDecimal computeRefundedAmount(
+            RequestOptions requestOptions,
+            Instant start,
+            Instant end
+    ) {
 
         BigDecimal refundedAmount = BigDecimal.ZERO;
+        long startSec = start.getEpochSecond();
+        long endSec = end.getEpochSecond();
 
+        RefundListParams params = RefundListParams.builder()
+                .setLimit(100L)
+                .build();
 
         try {
-            for (Refund refund : Refund.list(refundListParams, requestOptions).autoPagingIterable()) {
+            for (Refund refund : Refund.list(params, requestOptions).autoPagingIterable()) {
 
                 if (!"succeeded".equalsIgnoreCase(refund.getStatus())) {
-                    continue;  // Skip failed/pending refunds
+                    continue;
                 }
-                Long amountInCents = refund.getAmount();
-                if (amountInCents == null) continue;
 
-                BigDecimal amount = BigDecimal.valueOf(amountInCents)
+                if (refund.getCreated() < startSec || refund.getCreated() > endSec) {
+                    continue;
+                }
+
+                Long amount = refund.getAmount();
+                if (amount == null) continue;
+
+                BigDecimal refundValue = BigDecimal.valueOf(amount)
                         .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
-                refundedAmount = refundedAmount.add(amount);
+                refundedAmount = refundedAmount.add(refundValue);
             }
-            return refundedAmount;
-        } catch (StripeException e) {
-            throw new RuntimeException(e);
-        }
 
+            return refundedAmount.setScale(2, RoundingMode.HALF_UP);
+
+        } catch (StripeException e) {
+            throw new RuntimeException("Failed to compute refunded amount", e);
+        }
     }
 
-    private Long countPaidInvoices(RequestOptions requestOptions, Instant start, Instant end) {
-
-        InvoiceListParams invoiceListParams = InvoiceListParams.builder()
-                .setStatus(InvoiceListParams.Status.PAID)
-                .setCreated(InvoiceListParams.Created.builder()
-                        .setGte(start.getEpochSecond())
-                        .setLte(end.getEpochSecond())
-                        .build())
-                .setLimit(100L)
-                .build();
+    private Long countPaidInvoices(
+            RequestOptions requestOptions,
+            Instant start,
+            Instant end
+    ) {
         long count = 0;
+        long startSec = start.getEpochSecond();
+        long endSec = end.getEpochSecond();
 
         try {
-            for (Invoice invoice : Invoice.list(invoiceListParams, requestOptions).autoPagingIterable()) {
-                count++;
+            for (Invoice invoice : Invoice.list(
+                    InvoiceListParams.builder().setLimit(100L).build(),
+                    requestOptions
+            ).autoPagingIterable()) {
+
+                if (!"paid".equalsIgnoreCase(invoice.getStatus())) continue;
+
+                if (invoice.getStatusTransitions() == null ||
+                        invoice.getStatusTransitions().getPaidAt() == null) continue;
+
+                long paidAt = invoice.getStatusTransitions().getPaidAt();
+                if (paidAt >= startSec && paidAt <= endSec) {
+                    count++;
+                }
             }
             return count;
         } catch (StripeException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to count paid invoices", e);
         }
-
     }
 
-    private Long countFailedInvoices(RequestOptions requestOptions, Instant start, Instant end) {
-
-        InvoiceListParams invoiceListParams = InvoiceListParams.builder()
-                .setStatus(InvoiceListParams.Status.UNCOLLECTIBLE)
-                .setCreated(InvoiceListParams.Created.builder()
-                        .setGte(start.getEpochSecond())
-                        .setLte(end.getEpochSecond())
-                        .build())
-                .setLimit(100L)
-                .build();
+    private Long countFailedInvoices(
+            RequestOptions requestOptions,
+            Instant start,
+            Instant end
+    ) {
         long count = 0;
+        long startSec = start.getEpochSecond();
+        long endSec = end.getEpochSecond();
 
         try {
-            for (Invoice invoice : Invoice.list(invoiceListParams, requestOptions).autoPagingIterable()) {
-                count++;
+            for (Invoice invoice : Invoice.list(
+                    InvoiceListParams.builder().setLimit(100L).build(),
+                    requestOptions
+            ).autoPagingIterable()) {
+
+                if (!"uncollectible".equalsIgnoreCase(invoice.getStatus())) continue;
+
+                if (invoice.getCreated() >= startSec && invoice.getCreated() <= endSec) {
+                    count++;
+                }
             }
             return count;
         } catch (StripeException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to count failed invoices", e);
         }
     }
 
-    private BigDecimal computeAverageTransactionValue(BigDecimal grossRevenue, Long successfulCharges) {
-        //ATV
-        //Gross Revenue/Successful charges
+    private BigDecimal computeAverageTransactionValue(
+            BigDecimal grossRevenue,
+            Long successfulCharges
+    ) {
         if (successfulCharges == null || successfulCharges == 0) {
             return BigDecimal.ZERO;
         }
@@ -199,11 +282,8 @@ public class RevenueMetricServiceImpl implements RevenueMetricsService {
             Instant start,
             Instant end
     ) {
-        long days = ChronoUnit.DAYS.between(start, end) + 1;
-
-        if (days <= 0) {
-            days = 1;
-        }
+        long days = ChronoUnit.DAYS.between(start, end);
+        if (days <= 0) days = 1;
 
         return grossRevenue.divide(
                 BigDecimal.valueOf(days),
@@ -212,6 +292,21 @@ public class RevenueMetricServiceImpl implements RevenueMetricsService {
         );
     }
 
+    /**
+     * Convert to start of business day (fixes UTC mismatch)
+     */
+    private Instant toBusinessStartOfDay(Instant instant) {
+        LocalDate localDate = instant.atZone(BUSINESS_ZONE).toLocalDate();
+        return localDate.atStartOfDay(BUSINESS_ZONE).toInstant();
+    }
+
+    /**
+     * Convert to end of business day (23:59:59)
+     */
+    private Instant toBusinessEndOfDay(Instant instant) {
+        LocalDate localDate = instant.atZone(BUSINESS_ZONE).toLocalDate();
+        return localDate.plusDays(1).atStartOfDay(BUSINESS_ZONE).toInstant();
+    }
 
     private RequestOptions buildRequestOptions(Long businessId) {
         Business business = businessRepository.findById(businessId)
@@ -220,15 +315,15 @@ public class RevenueMetricServiceImpl implements RevenueMetricsService {
         String stripeAccountId = business.getPlatformAccounts().get(PlatformType.STRIPE);
 
         if (stripeAccountId != null) {
+            System.out.println("Using CONNECTED Stripe Account: " + stripeAccountId);
             return RequestOptions.builder()
                     .setStripeAccount(stripeAccountId)
                     .build();
         } else if ("dev".equals(appMode)) {
-            return RequestOptions.builder().build();  // Empty options for dev
+            System.out.println("DEV MODE: Using platform Stripe key");
+            return RequestOptions.builder().build();
         } else {
             throw new IllegalStateException("Stripe not connected for this business");
         }
     }
-
-
 }

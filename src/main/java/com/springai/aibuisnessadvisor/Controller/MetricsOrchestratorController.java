@@ -22,41 +22,41 @@ public class MetricsOrchestratorController {
      * Calculate and save a complete metrics snapshot
      * POST /api/v1/metrics/calculate/1?weeks=4
      */
-//    @PostMapping("/calculate/{businessId}")
-//    public ResponseEntity<BusinessMetrics> calculateAndSaveMetrics(
-//            @PathVariable Long businessId,
-//            @RequestParam(required = false) Long weeks,
-//            @RequestParam(required = false) Long months,
-//            @RequestParam(required = false) Instant end) {
-//
-//        if (end == null) {
-//            end = Instant.now();
-//        }
-//
-//        if (weeks != null && months != null) {
-//            throw new IllegalArgumentException("Provide either weeks OR months, not both");
-//        }
-//
-//        if (weeks == null && months == null) {
-//            throw new IllegalArgumentException("You must provide either weeks or months");
-//        }
-//
-//        Instant start;
-//        if (weeks != null) {
-//            start = end.minus(weeks * 7L, ChronoUnit.DAYS);
-//        } else {
-//            start = LocalDateTime.ofInstant(end, ZoneOffset.UTC)
-//                    .minusMonths(months)
-//                    .toInstant(ZoneOffset.UTC);
-//        }
-//
-//        // Calculate and save everything!
-//        BusinessMetrics snapshot = metricsOrchestratorService.calculateAndSaveAllMetrics(
-//                businessId, start, end, PlatformType.STRIPE
-//        );
-//
-//        return ResponseEntity.ok(snapshot);
-//    }
+    @PostMapping("/calculate/{businessId}")
+    public ResponseEntity<BusinessMetrics> calculateAndSaveMetrics(
+            @PathVariable Long businessId,
+            @RequestParam(required = false) Long weeks,
+            @RequestParam(required = false) Long months,
+            @RequestParam(required = false) Instant end) {
+
+        if (end == null) {
+            end = Instant.now();
+        }
+
+        if (weeks != null && months != null) {
+            throw new IllegalArgumentException("Provide either weeks OR months, not both");
+        }
+
+        if (weeks == null && months == null) {
+            throw new IllegalArgumentException("You must provide either weeks or months");
+        }
+
+        Instant start;
+        if (weeks != null) {
+            start = end.minus(weeks * 7L, ChronoUnit.DAYS);
+        } else {
+            start = LocalDateTime.ofInstant(end, ZoneOffset.UTC)
+                    .minusMonths(months)
+                    .toInstant(ZoneOffset.UTC);
+        }
+
+        // Calculate and save everything!
+        BusinessMetrics snapshot = metricsOrchestratorService.calculateAndSaveAllMetrics(
+                businessId, start, end, PlatformType.STRIPE
+        );
+
+        return ResponseEntity.ok(snapshot);
+    }
 
     /**
      * Get the latest saved snapshot

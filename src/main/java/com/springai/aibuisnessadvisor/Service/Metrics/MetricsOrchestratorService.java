@@ -4,9 +4,7 @@ import com.springai.aibuisnessadvisor.Model.*;
 import com.springai.aibuisnessadvisor.Repositories.BusinessMetricsRepository;
 import com.springai.aibuisnessadvisor.Repositories.BusinessRepository;
 import com.springai.aibuisnessadvisor.Repositories.ProductPerformanceRepository;
-
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,57 +19,61 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class MetricsOrchestratorService {
 
+    private final BusinessMetricsRepository businessMetricsRepository;
+    private final BusinessRepository businessRepository;
+    private final ProductPerformanceRepository productPerformanceRepository;
 
-        private final BusinessMetricsRepository businessMetricsRepository;
+    private final CustomerMetricsService customerMetricsService;
+    private final RevenueMetricsService revenueMetricsService;
+    private final RefundMetricsService refundMetricsService;
+    private final SubscriptionMetricsService subscriptionMetricsService;
+    private final InvoiceMetricsService invoiceMetricsService;
+    private final ProductPerformanceService productPerformanceService;
+    private final GrowthMetricsService growthMetricsService;
+    private final HealthMetricsService healthMetricsService;
 
-        private final BusinessRepository businessRepository;
+    /**
+     * Calculate all metrics and save as a snapshot (WITH FULL DEBUG LOGGING)
+     */
+    @Transactional
+    public BusinessMetrics calculateAndSaveAllMetrics(
+            Long businessId,
+            Instant start,
+            Instant end,
+            PlatformType platformType) {
 
-        private final ProductPerformanceRepository productPerformanceRepository;
+        System.out.println("\n================ METRICS SNAPSHOT DEBUG ================");
+        System.out.println("Business ID: " + businessId);
+        System.out.println("Platform: " + platformType);
+        System.out.println("Start Instant: " + start);
+        System.out.println("End Instant: " + end);
 
-        private final CustomerMetricsService customerMetricsService;
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
 
-        private final RevenueMetricsService revenueMetricsService;
+        LocalDate startDate = LocalDate.ofInstant(start, ZoneId.systemDefault());
+        LocalDate endDate = LocalDate.ofInstant(end, ZoneId.systemDefault());
 
-        private final RefundMetricsService refundMetricsService;
+        System.out.println("Start Date (Local): " + startDate);
+        System.out.println("End Date (Local): " + endDate);
 
-        private final SubscriptionMetricsService subscriptionMetricsService;
+        // Check if snapshot already exists
+        Optional<BusinessMetrics> existing =
+                businessMetricsRepository.findByBusinessAndStartDateAndEndDateAndPlatformType(
+                        business, startDate, endDate, platformType
+                );
 
-        private final InvoiceMetricsService invoiceMetricsService;
+        if (existing.isPresent()) {
+            System.out.println(" Snapshot already exists. Reusing existing snapshot. ID: "
+                    + existing.get().getId());
+            return existing.get();
+        }
 
-        private final ProductPerformanceService productPerformanceService;
 
-        private final GrowthMetricsService growthMetricsService;
 
-        private final HealthMetricsService healthMetricsService;
-        /**
-         * Calculate all metrics and save as a snapshot
-         */
-        @Transactional
-        public BusinessMetrics calculateAndSaveAllMetrics(
-                Long businessId,
-                Instant start,
-                Instant end,
-                PlatformType platformType) {
+        try {
+            System.out.println("\n--- STEP 1: COMPUTING CURRENT METRICS ---");
 
-            System.out.println("=== Calculating Metrics Snapshot ===");
-            System.out.println("Business ID: " + businessId);
-            System.out.println("Period: " + start + " to " + end);
-
-            Business business = businessRepository.findById(businessId)
-                    .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
-
-            LocalDate startDate=LocalDate.ofInstant(start, ZoneId.systemDefault());
-            LocalDate endDate=LocalDate.ofInstant(end, ZoneId.systemDefault());
-
-            Optional<BusinessMetrics> existing =businessMetricsRepository.findByBusinessAndStartDateAndEndDateAndPlatformType(
-                    business, startDate, endDate, platformType
-            );
-            if (existing.isPresent()) {
-                return existing.get();
-            }
-
-            // Calculate current period metrics
-try{
             CustomerMetrics customerMetrics = customerMetricsService.computeCustomerMetrics(
                     businessId, start, end, platformType
             );
@@ -93,22 +94,70 @@ try{
                     businessId, start, end, platformType
             );
 
-            List<ProductPerformance> productPerformances = productPerformanceService.getProductPerformanceService(
-                    businessId, start, end, platformType
-            );
+            List<ProductPerformance> productPerformances =
+                    productPerformanceService.getProductPerformanceService(
+                            businessId, start, end, platformType
+                    );
 
-            // Get previous period metrics for growth calculation
-            BusinessMetrics previousSnapshot = getPreviousSnapshot(business, start, end,platformType);
+            // ================= DEBUG CURRENT VALUES =================
+            System.out.println("\n--- CURRENT METRICS DEBUG ---");
 
-            RevenueMetrics previousRevenue = previousSnapshot != null
-                    ? previousSnapshot.getRevenueMetrics()
-                    : null;
+            if (revenueMetrics != null) {
+                System.out.println("Current Gross Revenue: " + revenueMetrics.getGrossRevenue());
+                System.out.println("Current Net Revenue: " + revenueMetrics.getNetRevenue());
+            } else {
+                System.out.println("RevenueMetrics = NULL ");
+            }
 
-            SubscriptionMetrics previousSubscription = previousSnapshot != null
-                    ? previousSnapshot.getSubscriptionMetrics()
-                    : null;
+            if (subscriptionMetrics != null) {
+                System.out.println("Current MRR: " + subscriptionMetrics.getMrr());
+                System.out.println("Current ARR: " + subscriptionMetrics.getArr());
+            } else {
+                System.out.println("SubscriptionMetrics = NULL ");
+            }
 
-            // Calculate growth metrics
+            // ================= PREVIOUS SNAPSHOT (USING LATEST - SAFER FOR SAAS) =================
+            System.out.println("\n--- STEP 2: FETCHING PREVIOUS SNAPSHOT (LATEST) ---");
+
+            BusinessMetrics previousSnapshot =
+                    getLatestSnapshot(businessId, platformType);
+
+            if (previousSnapshot == null) {
+                System.out.println(" Previous Snapshot: NULL (FIRST SNAPSHOT OR QUERY ISSUE)");
+            } else {
+                System.out.println(" Previous Snapshot Found!");
+                System.out.println("Previous Snapshot ID: " + previousSnapshot.getId());
+                System.out.println("Previous Period: "
+                        + previousSnapshot.getStartDate() + " → "
+                        + previousSnapshot.getEndDate());
+            }
+
+            RevenueMetrics previousRevenue =
+                    previousSnapshot != null ? previousSnapshot.getRevenueMetrics() : null;
+
+            SubscriptionMetrics previousSubscription =
+                    previousSnapshot != null ? previousSnapshot.getSubscriptionMetrics() : null;
+
+            // ================= DEBUG PREVIOUS VALUES =================
+            System.out.println("\n--- PREVIOUS METRICS DEBUG ---");
+
+            if (previousRevenue != null) {
+                System.out.println("Previous Gross Revenue: " + previousRevenue.getGrossRevenue());
+                System.out.println("Previous Net Revenue: " + previousRevenue.getNetRevenue());
+            } else {
+                System.out.println("Previous RevenueMetrics = NULL ");
+            }
+
+            if (previousSubscription != null) {
+                System.out.println("Previous MRR: " + previousSubscription.getMrr());
+                System.out.println("Previous ARR: " + previousSubscription.getArr());
+            } else {
+                System.out.println("Previous SubscriptionMetrics = NULL ️");
+            }
+
+            // ================= GROWTH METRICS =================
+            System.out.println("\n--- STEP 3: COMPUTING GROWTH METRICS ---");
+
             GrowthMetrics growthMetrics = growthMetricsService.computeGrowthMetrics(
                     revenueMetrics,
                     previousRevenue,
@@ -116,14 +165,35 @@ try{
                     previousSubscription
             );
 
-            HealthMetrics healthMetrics=healthMetricsService.computeHealthMetrics(customerMetrics,revenueMetrics,refundMetrics,subscriptionMetrics,growthMetrics);
+            System.out.println("\n--- GROWTH METRICS RESULT ---");
+            if (growthMetrics != null) {
+                System.out.println("MRR Growth Rate: " + growthMetrics.getMrrGrowthRate());
+                System.out.println("ARR Growth Rate: " + growthMetrics.getArrGrowthRate());
+                System.out.println("Gross Revenue Growth Rate: " + growthMetrics.getGrossRevenueGrowthRate());
+                System.out.println("Net Revenue Growth Rate: " + growthMetrics.getNetRevenueGrowthRate());
+                System.out.println("Growth Trend: " + growthMetrics.getGrowthTrend());
+            } else {
+                System.out.println("GrowthMetrics = NULL ");
+            }
 
-            // Create BusinessMetrics snapshot
+            // ================= HEALTH METRICS =================
+            System.out.println("\n--- STEP 4: COMPUTING HEALTH METRICS ---");
+            HealthMetrics healthMetrics = healthMetricsService.computeHealthMetrics(
+                    customerMetrics,
+                    revenueMetrics,
+                    refundMetrics,
+                    subscriptionMetrics,
+                    growthMetrics
+            );
+
+            // ================= CREATE SNAPSHOT =================
+            System.out.println("\n--- STEP 5: CREATING SNAPSHOT ENTITY ---");
+
             BusinessMetrics businessMetrics = new BusinessMetrics();
             businessMetrics.setBusiness(business);
             businessMetrics.setPlatformType(platformType);
-            businessMetrics.setStartDate(LocalDate.ofInstant(start, ZoneId.systemDefault()));
-            businessMetrics.setEndDate(LocalDate.ofInstant(end, ZoneId.systemDefault()));
+            businessMetrics.setStartDate(startDate);
+            businessMetrics.setEndDate(endDate);
             businessMetrics.setCollectedAt(Instant.now());
 
             businessMetrics.setCustomerMetrics(customerMetrics);
@@ -134,104 +204,95 @@ try{
             businessMetrics.setGrowthMetrics(growthMetrics);
             businessMetrics.setHealthMetrics(healthMetrics);
 
-            // Save BusinessMetrics first
+            System.out.println("Saving BusinessMetrics snapshot to database...");
+
             businessMetrics = businessMetricsRepository.save(businessMetrics);
 
-            // Link and save ProductPerformances
             for (ProductPerformance perf : productPerformances) {
                 perf.setBusinessMetrics(businessMetrics);
             }
             productPerformanceRepository.saveAll(productPerformances);
 
-            System.out.println("=== Snapshot Saved Successfully ===");
+            System.out.println("\n================ SNAPSHOT SAVED SUCCESSFULLY ================");
             System.out.println("Snapshot ID: " + businessMetrics.getId());
-            System.out.println("Growth Trend: " + growthMetrics.getGrowthTrend());
+            System.out.println("Final Growth Trend: " + growthMetrics.getGrowthTrend());
+            System.out.println("=============================================================\n");
 
             return businessMetrics;
-        }catch (DataIntegrityViolationException e){
-    System.out.println("SnapShot already exists");
 
-    return businessMetricsRepository
-            .findByBusinessAndStartDateAndEndDateAndPlatformType(
-                    business, startDate, endDate, platformType
-            )
-            .orElseThrow(() -> new RuntimeException("Failed to create or retrieve snapshot", e));
-
-}
-        }
-
-        /**
-         * Get the previous snapshot for comparison
-         * Looks for a snapshot that ended just before the current period starts
-         */
-        private BusinessMetrics getPreviousSnapshot(Business business, Instant currentStart, Instant currentEnd,PlatformType platformType) {
-            // Calculate period length
-
-            // Look for snapshot that ended around when current period started
-            LocalDate currentStartDate = LocalDate.ofInstant(currentStart, ZoneId.systemDefault());
-
-            // Find snapshot that ended close to this date
-            List<BusinessMetrics> snapshots = businessMetricsRepository
-                    .findByBusinessOrderByEndDateDesc(business);
-
-            return snapshots.stream()
-                    .filter(s -> s.getPlatformType() == platformType)
-                    .filter(s -> s.getEndDate().isBefore(currentStartDate))
-                    .findFirst()
-                    .orElse(null);
-//
-
-
-//            // Return the most recent snapshot before current period
-//            return snapshots.stream()
-//                    .filter(s -> s.getEndDate().isBefore(currentStartDate) || s.getEndDate().isEqual(previousEndDate))
-//                    .findFirst()
-//                    .orElse(null);
-        }
-
-        /**
-         * Get the latest saved snapshot for a business
-         */
-        public BusinessMetrics getLatestSnapshot(Long businessId) {
+        } catch (DataIntegrityViolationException e) {
+            System.out.println(" DataIntegrityViolationException: Snapshot likely already exists");
 
             return businessMetricsRepository
-                    .findFirstByBusiness_IdOrderByEndDateDesc(businessId)
-                    .orElse(null);
-        }
-
-        /**
-         * Get the latest snapshot by platform
-         */
-        public BusinessMetrics getLatestSnapshot(Long businessId, PlatformType platformType) {
-            Business business = businessRepository.findById(businessId)
-                    .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
-
-            return businessMetricsRepository
-                    .findFirstByBusinessAndPlatformTypeOrderByEndDateDesc(business, platformType)
-                    .orElse(null);
-        }
-
-        /**
-         * Get all historical snapshots for a business
-         */
-
-        public List<BusinessMetrics> getAllSnapshots(Long businessId) {
-            Business business = businessRepository.findById(businessId)
-                    .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
-
-            return businessMetricsRepository.findByBusinessOrderByEndDateDesc(business);
-        }
-
-        /**
-         * Get snapshot for specific period
-         */
-
-        public BusinessMetrics getSnapshotByPeriod(Long businessId, LocalDate start, LocalDate end) {
-            Business business = businessRepository.findById(businessId)
-                    .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
-
-            return businessMetricsRepository
-                    .findByBusinessAndStartDateAndEndDate(business, start, end)
-                    .orElse(null);
+                    .findByBusinessAndStartDateAndEndDateAndPlatformType(
+                            business, startDate, endDate, platformType
+                    )
+                    .orElseThrow(() -> new RuntimeException("Failed to create or retrieve snapshot", e));
         }
     }
+
+    /**
+     * Get the latest saved snapshot for a business (CRITICAL FOR GROWTH IN MVP SAAS)
+     */
+    public BusinessMetrics getLatestSnapshot(Long businessId) {
+        System.out.println("Fetching latest snapshot (any platform) for business: " + businessId);
+
+        BusinessMetrics snapshot = businessMetricsRepository
+                .findFirstByBusiness_IdOrderByEndDateDesc(businessId)
+                .orElse(null);
+
+        if (snapshot == null) {
+            System.out.println("Latest Snapshot = NULL");
+        } else {
+            System.out.println("Latest Snapshot ID: " + snapshot.getId());
+        }
+
+        return snapshot;
+    }
+
+    /**
+     * Get the latest snapshot by platform (USED FOR GROWTH COMPARISON)
+     */
+    public BusinessMetrics getLatestSnapshot(Long businessId, PlatformType platformType) {
+        System.out.println("Fetching latest snapshot for business: " + businessId + " | Platform: " + platformType);
+
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
+
+        BusinessMetrics snapshot = businessMetricsRepository
+                .findFirstByBusinessAndPlatformTypeOrderByEndDateDesc(business, platformType)
+                .orElse(null);
+
+        if (snapshot == null) {
+            System.out.println("Latest Platform Snapshot = NULL ");
+        } else {
+            System.out.println("Latest Platform Snapshot ID: " + snapshot.getId());
+            System.out.println("Latest Snapshot Period: "
+                    + snapshot.getStartDate() + " → " + snapshot.getEndDate());
+        }
+
+        return snapshot;
+    }
+
+    /**
+     * Get all historical snapshots for a business
+     */
+    public List<BusinessMetrics> getAllSnapshots(Long businessId) {
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
+
+        return businessMetricsRepository.findByBusinessOrderByEndDateDesc(business);
+    }
+
+    /**
+     * Get snapshot for specific period
+     */
+    public BusinessMetrics getSnapshotByPeriod(Long businessId, LocalDate start, LocalDate end) {
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
+
+        return businessMetricsRepository
+                .findByBusinessAndStartDateAndEndDate(business, start, end)
+                .orElse(null);
+    }
+}

@@ -42,7 +42,6 @@ public class CustomerServiceImpl implements CustomerMetricsService {
         long active=computeTotalActiveCustomersByPeriod(requestOptions,start,end,platformType);
         long newCustomers=computeNumberOfNewCustomers(requestOptions,start,end,platformType);
         long churnedCustomers=computeTotalChurnedCustomersByPeriod(requestOptions,start,end,platformType);
-
         CustomerMetrics metrics = new CustomerMetrics();
         metrics.setTotalCustomers(totalCustomers);
         metrics.setActiveCustomers(active);

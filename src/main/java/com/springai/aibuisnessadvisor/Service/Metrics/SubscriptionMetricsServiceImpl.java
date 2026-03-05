@@ -27,7 +27,18 @@ public class SubscriptionMetricsServiceImpl implements SubscriptionMetricsServic
     private String appMode;
 
     @Override
-    public SubscriptionMetrics computeSubscriptionMetrics(Long businessId, Instant start, Instant end, PlatformType platformType) {
+    public SubscriptionMetrics computeSubscriptionMetrics(
+            Long businessId,
+            Instant start,
+            Instant end,
+            PlatformType platformType) {
+
+        System.out.println("\n=========== STRIPE SUBSCRIPTION METRICS DEBUG ===========");
+        System.out.println("Business ID: " + businessId);
+        System.out.println("Platform: " + platformType);
+        System.out.println("Start: " + start);
+        System.out.println("End: " + end);
+
         RequestOptions requestOptions = buildRequestOptions(businessId);
 
         Long totalSubscriptions = countTotalSubscriptions(requestOptions);
@@ -38,11 +49,25 @@ public class SubscriptionMetricsServiceImpl implements SubscriptionMetricsServic
         Long newSubscriptions = countNewSubscriptions(requestOptions, start, end);
         Long canceledSubscriptions = countCanceledSubscriptions(requestOptions, start, end);
 
+        System.out.println("\n--- STRIPE COUNTS ---");
+        System.out.println("Total Subscriptions: " + totalSubscriptions);
+        System.out.println("Active Subscriptions: " + activeSubscriptions);
+        System.out.println("Trialing Subscriptions: " + trialingSubscriptions);
+        System.out.println("Paused Subscriptions: " + pausedSubscriptions);
+        System.out.println("New Subscriptions (period): " + newSubscriptions);
+        System.out.println("Canceled Subscriptions (period): " + canceledSubscriptions);
+
         BigDecimal mrr = computeMrr(requestOptions);
         BigDecimal arr = mrr.multiply(BigDecimal.valueOf(12));
 
-        BigDecimal averageRevenuePerSubscriptions = activeSubscriptions > 0 ? mrr.divide(BigDecimal.valueOf(activeSubscriptions), 2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
+        System.out.println("\n--- FINAL FINANCIAL METRICS ---");
+        System.out.println("Final MRR: " + mrr);
+        System.out.println("Final ARR: " + arr);
+
+        BigDecimal averageRevenuePerSubscription =
+                activeSubscriptions > 0
+                        ? mrr.divide(BigDecimal.valueOf(activeSubscriptions), 2, RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO;
 
         SubscriptionMetrics metrics = new SubscriptionMetrics();
         metrics.setTotalSubscriptions(totalSubscriptions);
@@ -53,26 +78,28 @@ public class SubscriptionMetricsServiceImpl implements SubscriptionMetricsServic
         metrics.setCanceledSubscriptions(canceledSubscriptions);
         metrics.setMrr(mrr);
         metrics.setArr(arr);
-        metrics.setAverageRevenuePerSubscription(averageRevenuePerSubscriptions);
+        metrics.setAverageRevenuePerSubscription(averageRevenuePerSubscription);
+
+        System.out.println("=========== END STRIPE METRICS DEBUG ===========\n");
+
         return metrics;
     }
 
     private Long countTotalSubscriptions(RequestOptions requestOptions) {
-        SubscriptionListParams subscriptionListParams = SubscriptionListParams.builder()
+        SubscriptionListParams params = SubscriptionListParams.builder()
                 .setStatus(SubscriptionListParams.Status.ALL)
                 .setLimit(100L)
                 .build();
+
         long count = 0;
         try {
-            for (Subscription sub : Subscription.list(subscriptionListParams, requestOptions).autoPagingIterable()) {
+            for (Subscription sub : Subscription.list(params, requestOptions).autoPagingIterable()) {
                 count++;
             }
             return count;
         } catch (StripeException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to count total subscriptions", e);
         }
-
-
     }
 
     private Long countSubscriptionsByStatus(RequestOptions requestOptions, SubscriptionListParams.Status status) {
@@ -82,13 +109,11 @@ public class SubscriptionMetricsServiceImpl implements SubscriptionMetricsServic
                 .build();
 
         long count = 0;
-
         try {
             for (Subscription sub : Subscription.list(params, requestOptions).autoPagingIterable()) {
                 count++;
             }
             return count;
-
         } catch (StripeException e) {
             throw new RuntimeException("Failed to count subscriptions by status: " + status, e);
         }
@@ -140,6 +165,10 @@ public class SubscriptionMetricsServiceImpl implements SubscriptionMetricsServic
         }
     }
 
+    /**
+     * FIXED for Stripe SDK 26+
+     * getUnitAmountDecimal() returns BigDecimal (NOT String)
+     */
     private BigDecimal computeMrr(RequestOptions requestOptions) {
         SubscriptionListParams params = SubscriptionListParams.builder()
                 .setStatus(SubscriptionListParams.Status.ACTIVE)
@@ -149,49 +178,82 @@ public class SubscriptionMetricsServiceImpl implements SubscriptionMetricsServic
         BigDecimal mrr = BigDecimal.ZERO;
 
         try {
-            for (Subscription sub :
-                    Subscription.list(params, requestOptions).autoPagingIterable()) {
+            for (Subscription sub : Subscription.list(params, requestOptions).autoPagingIterable()) {
 
-                if (sub.getItems() == null || sub.getItems().getData() == null) {System.out.println("item is null"); continue;}
+                System.out.println("\n[MRR] Subscription ID: " + sub.getId());
+                System.out.println("[MRR] Status: " + sub.getStatus());
+
+                if (sub.getItems() == null || sub.getItems().getData() == null) {
+                    System.out.println("[MRR] Items are NULL -> skipping");
+                    continue;
+                }
 
                 for (SubscriptionItem item : sub.getItems().getData()) {
 
-                    if (item.getPrice() == null ||
-                            item.getPrice().getRecurring() == null ||
-                            item.getPrice().getUnitAmount() == null) {
+                    if (item.getPrice() == null) {
+                        System.out.println("[MRR] Price is NULL -> skipping item");
                         continue;
                     }
 
-                    long unitAmountCents = item.getPrice().getUnitAmount();
-                    long quantity = item.getQuantity() != null ? item.getQuantity() : 1;
-
-                    BigDecimal amount =
-                            BigDecimal.valueOf(unitAmountCents)
-                                    .multiply(BigDecimal.valueOf(quantity))
-                                    .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
+                    if (item.getPrice().getRecurring() == null) {
+                        System.out.println("[MRR] Non-recurring price -> skipping");
+                        continue;
+                    }
 
                     String interval = item.getPrice().getRecurring().getInterval();
+                    long quantity = item.getQuantity() != null ? item.getQuantity() : 1;
+
+                    Long unitAmountCents = item.getPrice().getUnitAmount();
+                    BigDecimal unitAmountDecimal = item.getPrice().getUnitAmountDecimal();
+
+                    BigDecimal amount;
+
+                    if (unitAmountCents != null) {
+                        amount = BigDecimal.valueOf(unitAmountCents)
+                                .multiply(BigDecimal.valueOf(quantity))
+                                .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
+
+                        System.out.println("[MRR] Using unit_amount (cents): " + unitAmountCents);
+                    }
+                    else if (unitAmountDecimal != null) {
+                        amount = unitAmountDecimal
+                                .multiply(BigDecimal.valueOf(quantity))
+                                .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
+
+                        System.out.println("[MRR] Using unit_amount_decimal: " + unitAmountDecimal);
+                    }
+                    else {
+                        System.out.println("[MRR] WARNING: No price amount found (tiered/metered pricing?)");
+                        continue;
+                    }
+
+                    BigDecimal monthlyAmount;
 
                     if ("month".equals(interval)) {
-                        mrr = mrr.add(amount);
+                        monthlyAmount = amount;
                     } else if ("year".equals(interval)) {
-                        mrr = mrr.add(
-                                amount.divide(BigDecimal.valueOf(12), 10, RoundingMode.HALF_UP)
-                        );
+                        monthlyAmount = amount.divide(BigDecimal.valueOf(12), 10, RoundingMode.HALF_UP);
+                    } else {
+                        System.out.println("[MRR] Unsupported interval: " + interval);
+                        continue;
                     }
-                    System.out.println("    Current MRR: " + mrr);
 
+                    mrr = mrr.add(monthlyAmount);
+
+                    System.out.println("[MRR] Interval: " + interval +
+                            " | Quantity: " + quantity +
+                            " | Monthly Contribution: " + monthlyAmount.setScale(2, RoundingMode.HALF_UP) +
+                            " | Running MRR: " + mrr.setScale(2, RoundingMode.HALF_UP));
                 }
             }
-            System.out.println("Final MRR: " + mrr);
 
+            System.out.println("\n[MRR] FINAL COMPUTED MRR: " + mrr.setScale(2, RoundingMode.HALF_UP));
             return mrr.setScale(2, RoundingMode.HALF_UP);
 
         } catch (StripeException e) {
             throw new RuntimeException("Failed to compute MRR", e);
         }
     }
-
 
     private RequestOptions buildRequestOptions(Long businessId) {
         Business business = businessRepository.findById(businessId)
@@ -200,11 +262,13 @@ public class SubscriptionMetricsServiceImpl implements SubscriptionMetricsServic
         String stripeAccountId = business.getPlatformAccounts().get(PlatformType.STRIPE);
 
         if (stripeAccountId != null) {
+            System.out.println("Using Stripe Connected Account: " + stripeAccountId);
             return RequestOptions.builder()
                     .setStripeAccount(stripeAccountId)
                     .build();
         } else if ("dev".equals(appMode)) {
-            return RequestOptions.builder().build();  // Empty options for dev
+            System.out.println("DEV MODE: Using platform Stripe key");
+            return RequestOptions.builder().build();
         } else {
             throw new IllegalStateException("Stripe not connected for this business");
         }
