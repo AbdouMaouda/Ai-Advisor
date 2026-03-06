@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+body {
+    font-family: 'Inter', sans-serif;
+  @apply bg-white text-gray-900;
+}
+
+@keyframes blob1 {
+  0% { transform: translate(0px, 0px); }
+  50% { transform: translate(200px, 150px); }
+  100% { transform: translate(0px, 0px); }
+}
+
+@keyframes blob2 {
+  0% { transform: translate(0px, 0px); }
+  50% { transform: translate(-250px, 120px); }
+  100% { transform: translate(0px, 0px); }
+}
+
+@keyframes blob3 {
+  0% { transform: translate(0px, 0px); }
+  50% { transform: translate(150px, -200px); }
+  100% { transform: translate(0px, 0px); }
+}
+
+.animate-blob1 {
+  animation: blob1 18s ease-in-out infinite;
+}
+
+.animate-blob2 {
+  animation: blob2 22s ease-in-out infinite;
+}
+
+.animate-blob3 {
+  animation: blob3 26s ease-in-out infinite;
+}
+
+@keyframes revealWord {
+  0% {
+    opacity: 0;
+    transform: translateY(25px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+
+.animate-word1 {
+  animation: revealWord 0.8s ease forwards;
+  animation-delay: 0.2s;
+}
+
+.animate-word2 {
+  animation: revealWord 0.8s ease forwards;
+  animation-delay: 1s;
+}
+
+.animate-word3 {
+  animation: revealWord 0.8s ease forwards;
+  animation-delay: 1.8s;
+}
+
+/* Strong sinusoidal wave gradient animation - MUCH MORE VISIBLE */
+@keyframes sinusGradient {
+  0% {
+    transform: translate(-50%, -50%) translateX(-150px) translateY(0px);
+    opacity: 0.4;
+  }
+  25% {
+    transform: translate(-50%, -50%) translateX(0px) translateY(-50px);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(-50%, -50%) translateX(150px) translateY(0px);
+    opacity: 0.4;
+  }
+  75% {
+    transform: translate(-50%, -50%) translateX(0px) translateY(50px);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(-50%, -50%) translateX(-150px) translateY(0px);
+    opacity: 0.4;
+  }
+}
+
+.animate-sinusGradient {
+  animation: sinusGradient 4s ease-in-out infinite;
+  left: 50%;
+  top: 50%;
+}
