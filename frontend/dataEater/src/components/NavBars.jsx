@@ -1,4 +1,5 @@
 import { useState } from "react";
+import {Link} from "react-router-dom";
 
 export default function HomeNavbar() {
   return (
@@ -10,17 +11,17 @@ export default function HomeNavbar() {
 
       <div className="flex gap-8 text-gray-700">
 
-        <a href="#" className="hover:text-black">
+        <Link to="/product" className="hover:text-black">
           Product
-        </a>
+        </Link>
 
-        <a href="#" className="hover:text-black">
+        <Link to="/pricing" className="hover:text-black">
           Pricing
-        </a>
+        </Link>
 
-        <a href="#" className="hover:text-black">
+        <Link to="/docs" className="hover:text-black">
           Docs
-        </a>
+        </Link>
 
       </div>
 

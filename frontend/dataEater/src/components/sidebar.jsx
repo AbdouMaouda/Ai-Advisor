@@ -7,6 +7,8 @@ import {
   Settings
 } from "lucide-react";
 
+import { Link } from "react-router-dom";
+
 export default function Sidebar() {
   return (
     <div className="h-full bg-gray-50 p-6 flex flex-col">
@@ -27,11 +29,15 @@ export default function Sidebar() {
           <div className="space-y-1">
             <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white hover:shadow-sm transition-all text-gray-700 hover:text-gray-900">
               <LayoutDashboard size={20} />
-              <span className="font-medium">Dashboard</span>
+              <Link to="/dashboard" className="font-medium">
+                Dashboard
+              </Link>
             </button>
             <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white hover:shadow-sm transition-all text-gray-700 hover:text-gray-900">
               <Newspaper size={20} />
-              <span className="font-medium">Daily Brief</span>
+              <Link to="/dailybrief" className="font-medium">
+                Daily Brief
+              </Link>
             </button>
           </div>
         </div>
@@ -44,11 +50,15 @@ export default function Sidebar() {
           <div className="space-y-1">
             <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white hover:shadow-sm transition-all text-gray-700 hover:text-gray-900">
               <Brain size={20} />
-              <span className="font-medium">Insights</span>
+              <Link to="/insights" className="font-medium">
+                Insights
+              </Link>
             </button>
             <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white hover:shadow-sm transition-all text-gray-700 hover:text-gray-900">
               <Zap size={20} />
-              <span className="font-medium">Actions</span>
+              <Link to="/actiondetails" className="font-medium">
+                Actions
+              </Link>
             </button>
           </div>
         </div>
