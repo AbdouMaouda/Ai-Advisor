@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Sidebar from "../components/sidebar.jsx";
-import { Menu, X, AlertCircle, Clock, CheckCircle, ArrowLeft, Search, Zap, Target, Coffee } from "lucide-react";
+import { Menu, X, ArrowLeft, Search, Zap, AlertCircle, Clock, Target } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function ActionDetails() {
@@ -11,45 +11,14 @@ export default function ActionDetails() {
     setSidebarOpen(prev => !prev);
   };
 
-  const priorityFilters = [
-    { 
-      id: "all", 
-      label: "All Actions", 
-      count: 0,
-      gradient: "from-purple-500 to-blue-500",
-      icon: Target
-    },
-    { 
-      id: "urgent", 
-      label: "Urgent", 
-      count: 0, 
-      gradient: "from-red-500 to-pink-500",
-      icon: Zap
-    },
-    { 
-      id: "moderate", 
-      label: "Moderate", 
-      count: 0, 
-      gradient: "from-orange-500 to-yellow-500",
-      icon: Clock
-    },
-    { 
-      id: "low", 
-      label: "Low Priority", 
-      count: 0, 
-      gradient: "from-blue-500 to-cyan-500",
-      icon: Coffee
-    }
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
+    <div className="min-h-screen bg-[#FAFAFA]">
       
       {/* Mobile Toggle Button */}
       {!sidebarOpen && (
         <button
           onClick={toggleSidebar}
-          className="fixed top-6 left-6 z-50 p-2 rounded-lg hover:bg-white/80 transition-all bg-white/60 backdrop-blur-sm shadow-lg"
+          className="fixed top-6 left-6 z-50 p-2 rounded-lg hover:bg-white/80 transition-colors bg-white shadow-sm"
           aria-label="Open sidebar"
         >
           <Menu size={22} />
@@ -58,7 +27,7 @@ export default function ActionDetails() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-72 bg-gray-50 border-r border-gray-200 shadow-lg transform transition-transform duration-300 z-40 ${
+        className={`fixed top-0 left-0 h-full w-72 bg-gray-50 border-r border-gray-200 shadow-sm transform transition-transform duration-300 z-40 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -73,168 +42,240 @@ export default function ActionDetails() {
         <Sidebar />
       </aside>
 
-      {/* Main Content */}
-      <main className={`p-8 lg:p-12 transition-all duration-300 ${
-        sidebarOpen ? 'ml-72' : 'ml-0'
-      }`}>
-        <div className="max-w-6xl mx-auto">
-          
-          {/* Header with Back Button */}
-          <div className="mb-10">
-            <button className="group flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-all">
-              < Link to="/dailybrief" className="p-1 rounded-lg group-hover:bg-gray-200 transition-colors">
-                <ArrowLeft size={20} />
+      {/* Main Content - Unique Asymmetric Layout */}
+      <main className={`transition-all duration-300 ${sidebarOpen ? 'ml-72' : 'ml-0'}`}>
+        
+        {/* Floating Command Bar - Unique Element */}
+        <div className="sticky top-0 z-30 backdrop-blur-xl bg-white/70 border-b border-gray-200/50">
+          <div className="px-8 lg:px-12 py-4">
+            <div className="flex items-center gap-4">
+              
+              {/* Back Nav */}
+              <Link 
+                to="/dailybrief" 
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+              >
+                <ArrowLeft size={16} />
+                <span className="font-medium">Daily Brief</span>
               </Link>
-              <Link to="/dailybrief" className="font-semibold">
-                Back to Daily Brief
-              </Link>
-            </button>
-            
-            <div className="relative">
-              <div className="absolute -top-4 -left-4 w-24 h-24 bg-gradient-to-br from-purple-400/20 to-blue-400/20 rounded-full blur-2xl"></div>
-              <h1 className="text-5xl font-black text-gray-900 mb-3 relative">
-                Action Items
-              </h1>
-              <p className="text-gray-600 text-xl relative">
-                Your personalized to-do list, powered by AI
-              </p>
-            </div>
-          </div>
 
-          {/* Search and Filters Section */}
-          <div className="mb-8">
-            {/* Creative Search Bar */}
-            <div className="relative mb-6">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-2xl blur-xl"></div>
-              <div className="relative bg-white/80 backdrop-blur-sm border-2 border-gray-200/50 rounded-2xl p-2 shadow-lg hover:shadow-xl transition-all">
-                <div className="flex items-center gap-3 px-4">
-                  <Search className="text-gray-400" size={22} />
-                  <input
-                    type="text"
-                    placeholder="Search for actions, keywords, or priorities..."
-                    className="flex-1 py-3 bg-transparent border-none focus:outline-none text-gray-900 placeholder-gray-400 text-lg"
-                    disabled
-                  />
-                  <div className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-xl font-semibold text-sm opacity-50 cursor-not-allowed">
-                    Search
-                  </div>
-                </div>
-              </div>
-            </div>
+              {/* Divider */}
+              <div className="h-6 w-px bg-gray-300"></div>
 
-            {/* Creative Priority Pills */}
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-              {priorityFilters.map((filter) => {
-                const Icon = filter.icon;
-                const isSelected = selectedPriority === filter.id;
-                
-                return (
+              {/* Priority Toggles - Inline Tabs */}
+              <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+                {[
+                  { id: "all", label: "All", count: 0 },
+                  { id: "urgent", label: "Urgent", count: 0 },
+                  { id: "moderate", label: "Moderate", count: 0 },
+                  { id: "low", label: "Low", count: 0 }
+                ].map((filter) => (
                   <button
                     key={filter.id}
                     onClick={() => setSelectedPriority(filter.id)}
-                    className={`group relative flex items-center gap-3 px-6 py-3.5 rounded-2xl font-bold whitespace-nowrap transition-all ${
-                      isSelected 
-                        ? 'scale-105 shadow-xl' 
-                        : 'hover:scale-105 shadow-lg hover:shadow-xl'
+                    className={`px-3 py-1.5 text-xs font-semibold rounded transition-all ${
+                      selectedPriority === filter.id
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
-                    {/* Gradient Background */}
-                    <div className={`absolute inset-0 bg-gradient-to-r ${filter.gradient} rounded-2xl transition-opacity ${
-                      isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                    }`}></div>
-                    
-                    {/* White Background for non-selected */}
-                    {!isSelected && (
-                      <div className="absolute inset-0 bg-white rounded-2xl group-hover:opacity-0 transition-opacity"></div>
-                    )}
-                    
-                    {/* Content */}
-                    <div className="relative flex items-center gap-3">
-                      <div className={`p-2 rounded-lg transition-colors ${
-                        isSelected 
-                          ? 'bg-white/20' 
-                          : 'bg-gray-100 group-hover:bg-white/20'
-                      }`}>
-                        <Icon 
-                          size={20} 
-                          className={isSelected ? 'text-white' : 'text-gray-700 group-hover:text-white'}
-                        />
-                      </div>
-                      <span className={isSelected ? 'text-white' : 'text-gray-700 group-hover:text-white'}>
-                        {filter.label}
-                      </span>
-                      <div className={`px-2.5 py-1 rounded-full text-sm font-bold ${
-                        isSelected 
-                          ? 'bg-white/20 text-white' 
-                          : 'bg-gray-100 text-gray-700 group-hover:bg-white/20 group-hover:text-white'
-                      }`}>
-                        {filter.count}
-                      </div>
-                    </div>
+                    {filter.label} {filter.count > 0 && `· ${filter.count}`}
                   </button>
-                );
-              })}
+                ))}
+              </div>
+
+              {/* Search - Compact Command Style */}
+              <div className="flex-1 max-w-md ml-auto">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search actions... ⌘K"
+                    className="w-full pl-9 pr-4 py-1.5 text-sm bg-gray-100 border border-transparent rounded-lg focus:bg-white focus:border-gray-300 focus:outline-none transition-all"
+                    disabled
+                  />
+                </div>
+              </div>
+
             </div>
           </div>
+        </div>
 
-          {/* Creative Empty State */}
-          <div className="relative">
-            {/* Decorative elements */}
-            <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-10 right-10 w-40 h-40 bg-gradient-to-br from-blue-400/20 to-cyan-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        {/* Hero Section - Large Typography */}
+        <div className="px-8 lg:px-12 pt-16 pb-12">
+          <div className="max-w-6xl">
+            <h1 className="text-[56px] leading-[1.1] font-bold text-gray-900 mb-4 tracking-tight">
+              Action Items
+            </h1>
+            <p className="text-xl text-gray-600 font-light">
+              AI-prioritized tasks based on your business data
+            </p>
+          </div>
+        </div>
+
+        {/* Content Grid - Kanban-Inspired Layout */}
+        <div className="px-8 lg:px-12 pb-16">
+          <div className="grid grid-cols-12 gap-6 max-w-6xl">
             
-            <div className="relative bg-white/60 backdrop-blur-xl border-2 border-gray-200/50 rounded-3xl p-20 text-center shadow-2xl">
-              <div className="max-w-xl mx-auto">
-                {/* Animated Icon */}
-                <div className="relative mb-8 inline-block">
-                  <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full blur-xl opacity-50 animate-pulse"></div>
-                  <div className="relative bg-gradient-to-br from-green-50 to-emerald-50 w-28 h-28 rounded-full flex items-center justify-center mx-auto border-4 border-green-200">
-                    <CheckCircle className="text-green-600" size={56} strokeWidth={2.5} />
+            {/* Left Column - 8 cols - Action Lists */}
+            <div className="col-span-12 lg:col-span-8 space-y-6">
+              
+              {/* Urgent Section - Red Accent */}
+              <section className="group">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-6 bg-red-500 rounded-full"></div>
+                  <div className="flex items-center gap-2">
+                    <AlertCircle size={18} className="text-red-600" />
+                    <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Urgent</h2>
+                  </div>
+                  <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
+                    <span className="font-mono">0</span>
+                    <span>items</span>
+                  </div>
+                </div>
+                
+                {/* Empty State - Inline */}
+                <div className="bg-gradient-to-br from-red-50 to-orange-50 border-l-4 border-red-500 rounded-r-xl p-8 transition-all group-hover:shadow-md">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                      <AlertCircle size={20} className="text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 mb-1">All clear</h3>
+                      <p className="text-sm text-gray-600 leading-relaxed">
+                        No urgent actions detected. We'll alert you if anything critical comes up.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Moderate Section - Orange Accent */}
+              <section className="group">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-6 bg-orange-500 rounded-full"></div>
+                  <div className="flex items-center gap-2">
+                    <Clock size={18} className="text-orange-600" />
+                    <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Moderate</h2>
+                  </div>
+                  <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
+                    <span className="font-mono">0</span>
+                    <span>items</span>
+                  </div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-orange-50 to-yellow-50 border-l-4 border-orange-500 rounded-r-xl p-8 transition-all group-hover:shadow-md">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                      <Clock size={20} className="text-orange-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 mb-1">Nothing pending</h3>
+                      <p className="text-sm text-gray-600 leading-relaxed">
+                        No moderate priority items at the moment. Focus on long-term goals.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Low Priority Section - Blue Accent */}
+              <section className="group">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-6 bg-blue-500 rounded-full"></div>
+                  <div className="flex items-center gap-2">
+                    <Target size={18} className="text-blue-600" />
+                    <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Low Priority</h2>
+                  </div>
+                  <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
+                    <span className="font-mono">0</span>
+                    <span>items</span>
+                  </div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-l-4 border-blue-500 rounded-r-xl p-8 transition-all group-hover:shadow-md">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                      <Target size={20} className="text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 mb-1">Looking good</h3>
+                      <p className="text-sm text-gray-600 leading-relaxed">
+                        No low priority tasks. Your operations are running smoothly.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+            </div>
+
+            {/* Right Sidebar - 4 cols - Info Panel */}
+            <aside className="col-span-12 lg:col-span-4">
+              <div className="lg:sticky lg:top-24 space-y-6">
+                
+                {/* Status Card */}
+                <div className="bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-2xl p-6 shadow-xl">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                        Total Actions
+                      </p>
+                      <p className="text-5xl font-bold">0</p>
+                    </div>
+                    <div className="p-2 bg-white/10 rounded-lg">
+                      <Zap size={24} className="text-yellow-400" />
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-white/10">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-gray-400">Completion Rate</span>
+                      <span className="font-semibold">—</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-400">Avg Response Time</span>
+                      <span className="font-semibold">—</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Heading */}
-                <h2 className="text-4xl font-black text-gray-900 mb-4 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
-                  All Clear! 🎉
-                </h2>
-                
-                <p className="text-gray-600 text-lg mb-8 leading-relaxed">
-                  No action items right now. Connect your data sources and let our AI find opportunities and issues for you to tackle.
-                </p>
+                {/* AI Insight Box */}
+                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <p className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                      AI Monitoring
+                    </p>
+                  </div>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    Connect your data sources to enable continuous monitoring. We'll automatically surface action items as they arise.
+                  </p>
+                  <button className="w-full mt-4 px-4 py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 transition-colors">
+                    Get Started
+                  </button>
+                </div>
 
-                {/* CTA Button */}
-                <button className="group relative inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105">
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 rounded-2xl"></div>
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  <span className="relative text-white flex items-center gap-3">
-                    <Zap size={24} className="group-hover:rotate-12 transition-transform" />
-                    Connect Data Sources
-                  </span>
-                </button>
+                {/* Quick Stats */}
+                <div className="space-y-3">
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <p className="text-xs text-gray-600 mb-1">This Week</p>
+                    <p className="text-2xl font-bold text-gray-900">0</p>
+                    <p className="text-xs text-gray-500 mt-1">actions completed</p>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <p className="text-xs text-gray-600 mb-1">Response Time</p>
+                    <p className="text-2xl font-bold text-gray-900">—</p>
+                    <p className="text-xs text-gray-500 mt-1">average hours</p>
+                  </div>
+                </div>
 
-                {/* Decorative text */}
-                <p className="mt-6 text-sm text-gray-500 font-medium">
-                  We'll analyze your business data 24/7
-                </p>
               </div>
-            </div>
+            </aside>
+
           </div>
-
         </div>
-      </main>
 
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .delay-1000 {
-          animation-delay: 1s;
-        }
-      `}</style>
+      </main>
     </div>
   );
 }

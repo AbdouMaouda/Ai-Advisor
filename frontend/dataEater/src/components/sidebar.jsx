@@ -45,7 +45,7 @@ export default function Sidebar() {
         {/* AI */}
         <div>
           <h4 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3 px-3">
-            AI
+            AI-Powered Analysis
           </h4>
           <div className="space-y-1">
             <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white hover:shadow-sm transition-all text-gray-700 hover:text-gray-900">
