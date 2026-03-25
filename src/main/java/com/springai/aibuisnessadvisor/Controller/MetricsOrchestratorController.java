@@ -124,8 +124,8 @@ public class MetricsOrchestratorController {
 
         BusinessMetrics snapshot = metricsOrchestratorService.getSnapshotByPeriod(
                 businessId,
-                startDate,  // ← LocalDate
-                endDate     // ← LocalDate
+                startDate,
+                endDate
         );
 
         if (snapshot == null) {

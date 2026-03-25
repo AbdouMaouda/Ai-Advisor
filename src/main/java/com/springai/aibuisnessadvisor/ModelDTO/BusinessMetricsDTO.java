@@ -11,8 +11,8 @@ import java.time.LocalDate;
 @Setter
 public class BusinessMetricsDTO {
 
-    private Long id;                 // snapshot id (safe)
-    private Long businessId;          // reference, not full Business
+    private Long id;
+    private Long businessId;
     private PlatformType platformType;
 
     private LocalDate startDate;

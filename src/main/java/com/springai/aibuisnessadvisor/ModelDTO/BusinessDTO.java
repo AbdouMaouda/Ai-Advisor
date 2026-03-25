@@ -17,7 +17,6 @@ public class BusinessDTO {
     private String country;
     private String primaryCurrency;
 
-    // Connected platform account IDs (SAFE to expose)
     private Map<PlatformType, String> platformAccounts;
 
     private Boolean isActive;

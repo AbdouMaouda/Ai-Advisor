@@ -1,14 +1,20 @@
 package com.springai.aibuisnessadvisor.Service.Metrics;
 
+import com.springai.aibuisnessadvisor.ModelDTO.BusinessMetricsForAi;
 import com.springai.aibuisnessadvisor.Model.*;
+import com.springai.aibuisnessadvisor.ModelDTO.HealthInsights;
 import com.springai.aibuisnessadvisor.Repositories.BusinessMetricsRepository;
 import com.springai.aibuisnessadvisor.Repositories.BusinessRepository;
 import com.springai.aibuisnessadvisor.Repositories.ProductPerformanceRepository;
+import com.springai.aibuisnessadvisor.Service.AI.AIInsightsService;
+import com.springai.aibuisnessadvisor.Service.AI.AIService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -22,7 +28,7 @@ public class MetricsOrchestratorService {
     private final BusinessMetricsRepository businessMetricsRepository;
     private final BusinessRepository businessRepository;
     private final ProductPerformanceRepository productPerformanceRepository;
-
+    private final AIInsightsService aiInsightsService;
     private final CustomerMetricsService customerMetricsService;
     private final RevenueMetricsService revenueMetricsService;
     private final RefundMetricsService refundMetricsService;
@@ -68,7 +74,6 @@ public class MetricsOrchestratorService {
                     + existing.get().getId());
             return existing.get();
         }
-
 
 
         try {
@@ -186,6 +191,35 @@ public class MetricsOrchestratorService {
                     growthMetrics
             );
 
+            BusinessMetricsForAi metricsForAI = buildMetricsForAI(
+                    customerMetrics,
+                    revenueMetrics,
+                    refundMetrics,
+                    subscriptionMetrics,
+                    invoiceMetrics,
+                    growthMetrics,
+                    healthMetrics,
+                    previousSnapshot
+            );
+
+            try {
+                HealthInsights insights = aiInsightsService.AIInsights(metricsForAI);
+
+                healthMetrics.setStrengths(insights.getStrengths());
+                healthMetrics.setWarnings(insights.getWarnings());
+                healthMetrics.setRecommendations(insights.getRecommendations());
+
+                System.out.println(" AI Insights:");
+                System.out.println("   Strengths: " + insights.getStrengths().size());
+                System.out.println("   Warnings: " + insights.getWarnings().size());
+                System.out.println("   Recommendations: " + insights.getRecommendations().size());
+
+            } catch (Exception e) {
+                System.err.println(" AI insights generation failed: " + e.getMessage());
+                e.printStackTrace();
+                // Don't fail entire snapshot if AI fails
+            }
+
             // ================= CREATE SNAPSHOT =================
             System.out.println("\n--- STEP 5: CREATING SNAPSHOT ENTITY ---");
 
@@ -295,4 +329,210 @@ public class MetricsOrchestratorService {
                 .findByBusinessAndStartDateAndEndDate(business, start, end)
                 .orElse(null);
     }
+
+
+    /**
+     * Extract and calculate metrics for AI analysis
+     * This does NOT recalculate - just copies and derives simple values
+     */
+    private BusinessMetricsForAi buildMetricsForAI(
+            CustomerMetrics customerMetrics,
+            RevenueMetrics revenueMetrics,
+            RefundMetrics refundMetrics,
+            SubscriptionMetrics subscriptionMetrics,
+            InvoiceMetrics invoiceMetrics,
+            GrowthMetrics growthMetrics,
+            HealthMetrics healthMetrics,
+            BusinessMetrics previousSnapshot) {
+
+        System.out.println("Building BusinessMetricsForAI DTO...");
+
+        // Extract previous period data (if exists)
+        SubscriptionMetrics prevSub = previousSnapshot != null
+                ? previousSnapshot.getSubscriptionMetrics()
+                : null;
+        CustomerMetrics prevCust = previousSnapshot != null
+                ? previousSnapshot.getCustomerMetrics()
+                : null;
+        RevenueMetrics prevRev = previousSnapshot != null
+                ? previousSnapshot.getRevenueMetrics()
+                : null;
+
+        // ========== CALCULATE DERIVED VALUES ==========
+
+        // Net revenue ratio
+        BigDecimal netRevenueRatio = BigDecimal.ZERO;
+        if (revenueMetrics.getGrossRevenue() != null &&
+                revenueMetrics.getGrossRevenue().compareTo(BigDecimal.ZERO) > 0) {
+            netRevenueRatio = revenueMetrics.getNetRevenue()
+                    .divide(revenueMetrics.getGrossRevenue(), 4, RoundingMode.HALF_UP);
+        }
+
+        // Churn rate
+        double churnRate = 0.0;
+        if (customerMetrics.getTotalCustomers() != null && customerMetrics.getTotalCustomers() > 0) {
+            long churned = customerMetrics.getChurnedCustomers() != null
+                    ? customerMetrics.getChurnedCustomers()
+                    : 0;
+            churnRate = (churned / (double) customerMetrics.getTotalCustomers()) * 100.0;
+        }
+
+        // Active customer ratio
+        double activeCustomerRatio = 0.0;
+        if (customerMetrics.getTotalCustomers() != null && customerMetrics.getTotalCustomers() > 0) {
+            long active = customerMetrics.getActiveCustomers() != null
+                    ? customerMetrics.getActiveCustomers()
+                    : 0;
+            activeCustomerRatio = (double) active / customerMetrics.getTotalCustomers();
+        }
+
+        // Active subscription ratio
+        double activeSubscriptionRatio = 0.0;
+        if (subscriptionMetrics.getTotalSubscriptions() != null && subscriptionMetrics.getTotalSubscriptions() > 0) {
+            long active = subscriptionMetrics.getActiveSubscriptions() != null
+                    ? subscriptionMetrics.getActiveSubscriptions()
+                    : 0;
+            activeSubscriptionRatio = (double) active / subscriptionMetrics.getTotalSubscriptions();
+        }
+
+        // Customer growth (absolute count)
+        Long customerGrowth = null;
+        if (prevCust != null && prevCust.getActiveCustomers() != null &&
+                customerMetrics.getActiveCustomers() != null) {
+            customerGrowth = customerMetrics.getActiveCustomers() - prevCust.getActiveCustomers();
+        }
+
+        // Customer growth rate (percentage)
+        Double customerGrowthRate = null;
+        if (prevCust != null && prevCust.getActiveCustomers() != null && prevCust.getActiveCustomers() > 0) {
+            long current = customerMetrics.getActiveCustomers() != null
+                    ? customerMetrics.getActiveCustomers()
+                    : 0;
+            customerGrowthRate = ((current - prevCust.getActiveCustomers()) / (double) prevCust.getActiveCustomers()) * 100.0;
+        }
+
+        // ARPU (Average Revenue Per User)
+        BigDecimal arpu = BigDecimal.ZERO;
+        if (customerMetrics.getActiveCustomers() != null && customerMetrics.getActiveCustomers() > 0 &&
+                subscriptionMetrics.getMrr() != null) {
+            arpu = subscriptionMetrics.getMrr().divide(
+                    BigDecimal.valueOf(customerMetrics.getActiveCustomers()),
+                    2,
+                    RoundingMode.HALF_UP
+            );
+        }
+
+        // LTV (Customer Lifetime Value)
+        BigDecimal ltv = BigDecimal.ZERO;
+        if (churnRate > 0) {
+            double monthlyChurn = churnRate / 100.0;
+            ltv = arpu.divide(BigDecimal.valueOf(monthlyChurn), 2, RoundingMode.HALF_UP);
+        } else if (arpu.compareTo(BigDecimal.ZERO) > 0) {
+            ltv = arpu.multiply(BigDecimal.valueOf(36)); // Assume 3 years if no churn
+        }
+
+        // CAC (Customer Acquisition Cost) - placeholder
+
+        BigDecimal cac = BigDecimal.valueOf(100);
+
+        // LTV/CAC Ratio
+        BigDecimal ltvcacRatio = BigDecimal.ZERO;
+        if (cac.compareTo(BigDecimal.ZERO) > 0 && ltv.compareTo(BigDecimal.ZERO) > 0) {
+            ltvcacRatio = ltv.divide(cac, 2, RoundingMode.HALF_UP);
+        }
+
+        Double paymentSuccessRate = null;
+        if (invoiceMetrics != null &&
+                invoiceMetrics.getTotalInvoices() != null &&
+                invoiceMetrics.getTotalInvoices() > 0) {
+
+            long paid = invoiceMetrics.getPaidInvoices() != null ? invoiceMetrics.getPaidInvoices() : 0;
+            paymentSuccessRate = (paid / (double) invoiceMetrics.getTotalInvoices()) * 100.0;
+        }
+        //BUILD DTO (JUST COPYING/ASSIGNING)
+        return BusinessMetricsForAi.builder()
+                // Revenue
+                .currentGrossRevenue(revenueMetrics.getGrossRevenue())
+                .previousGrossRevenue(prevRev != null ? prevRev.getGrossRevenue() : BigDecimal.ZERO)
+                .grossRevenueGrowthRate(growthMetrics != null ? growthMetrics.getGrossRevenueGrowthRate() : BigDecimal.ZERO)
+
+                .currentNetRevenue(revenueMetrics.getNetRevenue())
+                .previousNetRevenue(prevRev != null ? prevRev.getNetRevenue() : BigDecimal.ZERO)
+                .netRevenueGrowthRate(growthMetrics != null ? growthMetrics.getNetRevenueGrowthRate() : BigDecimal.ZERO)
+                .netRevenueRatio(netRevenueRatio)
+
+                // MRR/ARR
+                .currentMrr(subscriptionMetrics.getMrr())
+                .previousMrr(prevSub != null ? prevSub.getMrr() : BigDecimal.ZERO)
+                .mrrGrowthRate(growthMetrics != null ? growthMetrics.getMrrGrowthRate() : BigDecimal.ZERO)
+
+                .currentArr(subscriptionMetrics.getArr())
+                .previousArr(prevSub != null ? prevSub.getArr() : BigDecimal.ZERO)
+                .arrGrowthRate(growthMetrics != null ? growthMetrics.getArrGrowthRate() : BigDecimal.ZERO)
+
+                // Customers
+                .totalCustomers(customerMetrics.getTotalCustomers())
+                .activeCustomers(customerMetrics.getActiveCustomers())
+                .previousActiveCustomers(prevCust != null ? prevCust.getActiveCustomers() : 0L)
+                .newCustomers(customerMetrics.getNewCustomers())
+                .churnedCustomers(customerMetrics.getChurnedCustomers())
+                .churnRate(churnRate)
+                .retentionRate(100.0 - churnRate)
+                .activeCustomerRatio(activeCustomerRatio)
+                .customerGrowth(customerGrowth)
+                .customerGrowthRate(customerGrowthRate)
+
+                // Subscriptions
+                .totalSubscriptions(subscriptionMetrics.getTotalSubscriptions())
+                .activeSubscriptions(subscriptionMetrics.getActiveSubscriptions())
+                .previousActiveSubscriptions(prevSub != null ? prevSub.getActiveSubscriptions() : 0L)
+                .newSubscriptions(subscriptionMetrics.getNewSubscriptions())
+                .cancelledSubscriptions(subscriptionMetrics.getCanceledSubscriptions())
+                .activeSubscriptionRatio(activeSubscriptionRatio)
+                .trialConversionRate(null) // OK if you don't have trial data
+
+                // Financial
+                .averageRevenuePerUser(arpu)
+                .customerLifetimeValue(ltv)
+                .customerAcquisitionCost(cac)
+                .ltvcacRatio(ltvcacRatio)
+
+                // Refunds
+                .refundRate(refundMetrics.getRefundRate())
+                .totalRefunds(refundMetrics.getTotalRefundAmount())
+                .refundCount(refundMetrics.getTotalRefunds())
+
+                // Invoices/Payments
+                .totalInvoices(invoiceMetrics != null ? invoiceMetrics.getTotalInvoices() : null)
+                .paidInvoices(invoiceMetrics != null ? invoiceMetrics.getPaidInvoices() : null)
+                .pendingInvoices(invoiceMetrics != null ? invoiceMetrics.getUnpaidInvoices() : null)  // ← ADD THIS
+                .overdueInvoices(invoiceMetrics != null ? invoiceMetrics.getOverdueInvoices() : null)
+                .paymentSuccessRate(paymentSuccessRate)
+                .averagePaymentTime(invoiceMetrics != null && invoiceMetrics.getAverageDaysToPayment() != null
+                        ? invoiceMetrics.getAverageDaysToPayment().doubleValue()
+                        : null)  //
+
+                // Growth
+                .growthTrend(growthMetrics != null && growthMetrics.getGrowthTrend() != null
+                        ? growthMetrics.getGrowthTrend().toString()
+                        : "STABLE")
+
+                // Health Scores
+                .overallHealthScore(healthMetrics.getHealthScore())
+                .customerScore(null)
+                .revenueScore(null)
+                .subscriptionScore(null)
+                .growthScore(null)
+                .refundScore(null)
+
+                // Time
+                .periodStart(LocalDate.now().withDayOfMonth(1))
+                .periodEnd(LocalDate.now())
+                .comparisonPeriod("vs previous month")
+
+                .build();
+    }
 }
+
+
+
