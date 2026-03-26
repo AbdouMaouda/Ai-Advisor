@@ -4,6 +4,7 @@ import com.springai.aibuisnessadvisor.Model.Business;
 import com.springai.aibuisnessadvisor.Model.InvoiceMetrics;
 import com.springai.aibuisnessadvisor.Model.PlatformType;
 import com.springai.aibuisnessadvisor.Repositories.BusinessRepository;
+import com.springai.aibuisnessadvisor.Service.StripeRequestOptionsBuilder;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Invoice;
 import com.stripe.net.RequestOptions;
@@ -20,15 +21,16 @@ import java.util.List;
 
 @Service
 public class InvoiceMetricsServiceImpl implements InvoiceMetricsService {
-    @Value("${app.mode}")
-    private String appMode;
+    private final StripeRequestOptionsBuilder stripeRequestOptionsBuilder;
 
-    @Autowired
-    private BusinessRepository businessRepository;
+    public InvoiceMetricsServiceImpl(StripeRequestOptionsBuilder stripeRequestOptionsBuilder) {
+        this.stripeRequestOptionsBuilder = stripeRequestOptionsBuilder;
+    }
+
 
     @Override
     public InvoiceMetrics computeInvoiceMetrics(Long businessId, Instant start, Instant end, PlatformType platformType) {
-        RequestOptions requestOptions = buildRequestOptions(businessId);
+        RequestOptions requestOptions = stripeRequestOptionsBuilder.createRequestOptions(businessId);
 
         Long totalInvoices = countAllInvoices(requestOptions, start, end);
         Long paidInvoices = countInvoicesByStatus(requestOptions, start, end, InvoiceListParams.Status.PAID);
@@ -274,20 +276,5 @@ public class InvoiceMetricsServiceImpl implements InvoiceMetricsService {
 
     }
 
-    private RequestOptions buildRequestOptions(Long businessId) {
-        Business business = businessRepository.findById(businessId)
-                .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
 
-        String stripeAccountId = business.getPlatformAccounts().get(PlatformType.STRIPE);
-
-        if (stripeAccountId != null) {
-            return RequestOptions.builder()
-                    .setStripeAccount(stripeAccountId)
-                    .build();
-        } else if ("dev".equals(appMode)) {
-            return RequestOptions.builder().build();  // Empty options for dev
-        } else {
-            throw new IllegalStateException("Stripe not connected for this business");
-        }
-    }
 }

@@ -4,6 +4,7 @@ import com.springai.aibuisnessadvisor.Model.Business;
 import com.springai.aibuisnessadvisor.Model.PlatformType;
 import com.springai.aibuisnessadvisor.Model.RevenueMetrics;
 import com.springai.aibuisnessadvisor.Repositories.BusinessRepository;
+import com.springai.aibuisnessadvisor.Service.StripeRequestOptionsBuilder;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Invoice;
 import com.stripe.model.Refund;
@@ -11,6 +12,7 @@ import com.stripe.net.RequestOptions;
 import com.stripe.param.InvoiceListParams;
 import com.stripe.param.RefundListParams;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -23,13 +25,10 @@ import java.time.temporal.ChronoUnit;
 @RequiredArgsConstructor
 public class RevenueMetricServiceImpl implements RevenueMetricsService {
 
-    private final BusinessRepository businessRepository;
-
-    @Value("${app.mode}")
-    private String appMode;
-
-    // Default business timezone (VERY IMPORTANT for SaaS analytics)
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("America/Toronto");
+    @Autowired
+    private final StripeRequestOptionsBuilder stripeRequestOptionsBuilder;
+
 
     @Override
     public RevenueMetrics computeRevenueMetrics(
@@ -45,7 +44,7 @@ public class RevenueMetricServiceImpl implements RevenueMetricsService {
         System.out.println("Raw Start (UTC): " + start);
         System.out.println("Raw End (UTC): " + end);
 
-        RequestOptions requestOptions = buildRequestOptions(businessId);
+        RequestOptions requestOptions = stripeRequestOptionsBuilder.createRequestOptions(businessId);
 
         // 🔥 Convert to BUSINESS LOCAL DAY WINDOW (fixes your main bug)
         Instant correctedStart = toBusinessStartOfDay(start);
@@ -308,22 +307,4 @@ public class RevenueMetricServiceImpl implements RevenueMetricsService {
         return localDate.plusDays(1).atStartOfDay(BUSINESS_ZONE).toInstant();
     }
 
-    private RequestOptions buildRequestOptions(Long businessId) {
-        Business business = businessRepository.findById(businessId)
-                .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
-
-        String stripeAccountId = business.getPlatformAccounts().get(PlatformType.STRIPE);
-
-        if (stripeAccountId != null) {
-            System.out.println("Using CONNECTED Stripe Account: " + stripeAccountId);
-            return RequestOptions.builder()
-                    .setStripeAccount(stripeAccountId)
-                    .build();
-        } else if ("dev".equals(appMode)) {
-            System.out.println("DEV MODE: Using platform Stripe key");
-            return RequestOptions.builder().build();
-        } else {
-            throw new IllegalStateException("Stripe not connected for this business");
-        }
-    }
 }

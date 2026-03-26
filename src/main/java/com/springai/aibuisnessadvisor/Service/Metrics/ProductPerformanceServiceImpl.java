@@ -4,6 +4,7 @@ import com.springai.aibuisnessadvisor.Model.Business;
 import com.springai.aibuisnessadvisor.Model.PlatformType;
 import com.springai.aibuisnessadvisor.Model.ProductPerformance;
 import com.springai.aibuisnessadvisor.Repositories.BusinessRepository;
+import com.springai.aibuisnessadvisor.Service.StripeRequestOptionsBuilder;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Invoice;
 import com.stripe.model.InvoiceLineItem;
@@ -22,15 +23,16 @@ import java.util.stream.Collectors;
 
 @Service
 public class ProductPerformanceServiceImpl implements ProductPerformanceService {
-    @Autowired
-    private BusinessRepository businessRepository;
+    private final StripeRequestOptionsBuilder stripeRequestOptionsBuilder;
 
-    @Value("${app.mode}")
-    private String appMode;
+    public ProductPerformanceServiceImpl(StripeRequestOptionsBuilder stripeRequestOptionsBuilder) {
+        this.stripeRequestOptionsBuilder = stripeRequestOptionsBuilder;
+    }
+
 
     @Override
     public List<ProductPerformance> getProductPerformanceService(Long businessId, Instant start, Instant end, PlatformType platformType) {
-        RequestOptions requestOptions = buildRequestOptions(businessId);
+        RequestOptions requestOptions = stripeRequestOptionsBuilder.createRequestOptions(businessId);
 
         Map<String, ProductData> productMap = new HashMap<>();//store name and the product Data
 
@@ -143,22 +145,7 @@ public class ProductPerformanceServiceImpl implements ProductPerformanceService 
         return performance;
     }
 
-    private RequestOptions buildRequestOptions(Long businessId) {
-        Business business = businessRepository.findById(businessId)
-                .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
 
-        String stripeAccountId = business.getPlatformAccounts().get(PlatformType.STRIPE);
-
-        if (stripeAccountId != null) {
-            return RequestOptions.builder()
-                    .setStripeAccount(stripeAccountId)
-                    .build();
-        } else if ("dev".equals(appMode)) {
-            return RequestOptions.builder().build();  // Empty options for dev
-        } else {
-            throw new IllegalStateException("Stripe not connected for this business");
-        }
-    }
 
     private static class ProductData {
         String productId;

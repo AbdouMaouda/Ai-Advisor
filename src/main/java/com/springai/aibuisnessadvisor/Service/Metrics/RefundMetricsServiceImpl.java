@@ -4,6 +4,7 @@ import com.springai.aibuisnessadvisor.Model.Business;
 import com.springai.aibuisnessadvisor.Model.PlatformType;
 import com.springai.aibuisnessadvisor.Model.RefundMetrics;
 import com.springai.aibuisnessadvisor.Repositories.BusinessRepository;
+import com.springai.aibuisnessadvisor.Service.StripeRequestOptionsBuilder;
 import com.stripe.exception.StripeException;
 import com.stripe.model.BalanceTransaction;
 import com.stripe.model.Charge;
@@ -23,16 +24,16 @@ import java.time.Instant;
 @Service
 public class RefundMetricsServiceImpl implements RefundMetricsService {
 
+    private final StripeRequestOptionsBuilder stripeRequestOptionsBuilder;
 
-    @Autowired
-    private BusinessRepository businessRepository;
+    public RefundMetricsServiceImpl(StripeRequestOptionsBuilder stripeRequestOptionsBuilder) {
+        this.stripeRequestOptionsBuilder = stripeRequestOptionsBuilder;
+    }
 
-    @Value("${app.mode}")
-    private String appMode;
 
     @Override
     public RefundMetrics computeRefundMetrics(Long businessId, Instant start, Instant end, PlatformType platformType) {
-        RequestOptions requestOptions = buildRequestOptions(businessId);
+        RequestOptions requestOptions = stripeRequestOptionsBuilder.createRequestOptions(businessId);
 
         // Calculate all refund metrics
         Long totalRefunds = countTotalRefunds(requestOptions, start, end);
@@ -160,23 +161,6 @@ public class RefundMetricsServiceImpl implements RefundMetricsService {
         }
     }
 
-
-    private RequestOptions buildRequestOptions(Long businessId) {
-        Business business = businessRepository.findById(businessId)
-                .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
-
-        String stripeAccountId = business.getPlatformAccounts().get(PlatformType.STRIPE);
-
-        if (stripeAccountId != null) {
-            return RequestOptions.builder()
-                    .setStripeAccount(stripeAccountId)
-                    .build();
-        } else if ("dev".equals(appMode)) {
-            return RequestOptions.builder().build();  // Empty options for dev
-        } else {
-            throw new IllegalStateException("Stripe not connected for this business");
-        }
-    }
 
 
 }

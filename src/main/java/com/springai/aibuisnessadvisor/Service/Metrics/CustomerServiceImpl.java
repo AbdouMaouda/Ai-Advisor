@@ -4,6 +4,7 @@ import com.springai.aibuisnessadvisor.Model.Business;
 import com.springai.aibuisnessadvisor.Model.CustomerMetrics;
 import com.springai.aibuisnessadvisor.Model.PlatformType;
 import com.springai.aibuisnessadvisor.Repositories.BusinessRepository;
+import com.springai.aibuisnessadvisor.Service.StripeRequestOptionsBuilder;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
 
@@ -25,19 +26,15 @@ import java.util.*;
 @Service
 public class CustomerServiceImpl implements CustomerMetricsService {
 
-    @Value("${app.mode}")
-    private String appMode;
+    private final StripeRequestOptionsBuilder stripeRequestOptionsBuilder;
 
-
-    @Autowired
-    BusinessRepository businessRepository;
-
-
+    public CustomerServiceImpl(StripeRequestOptionsBuilder stripeRequestOptionsBuilder) {
+        this.stripeRequestOptionsBuilder = stripeRequestOptionsBuilder;
+    }
 
     @Override
     public CustomerMetrics computeCustomerMetrics(Long businessId, Instant start, Instant end, PlatformType platformType) {
-        RequestOptions requestOptions=buildRequestOptions(businessId);
-
+        RequestOptions requestOptions=stripeRequestOptionsBuilder.createRequestOptions(businessId);
         long totalCustomers=computeTotalCustomers(requestOptions,end,platformType);
         long active=computeTotalActiveCustomersByPeriod(requestOptions,start,end,platformType);
         long newCustomers=computeNumberOfNewCustomers(requestOptions,start,end,platformType);
@@ -182,33 +179,6 @@ public class CustomerServiceImpl implements CustomerMetricsService {
             throw new RuntimeException("Failed to get churned customers", e);
         }
     }
-
-
-    private RequestOptions buildRequestOptions(Long businessId) {
-        Business business = businessRepository.findById(businessId)
-                .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
-
-        String stripeAccountId = business.getPlatformAccounts().get(PlatformType.STRIPE);
-
-        if (stripeAccountId != null) {
-            return RequestOptions.builder()
-                    .setStripeAccount(stripeAccountId)
-                    .build();
-        } else if ("dev".equals(appMode)) {
-            return RequestOptions.builder().build();  // Empty options for dev
-        } else {
-            throw new IllegalStateException("Stripe not connected for this business");
-        }
-    }
-
-
-
-
-
-
-
-
-
 
 
 

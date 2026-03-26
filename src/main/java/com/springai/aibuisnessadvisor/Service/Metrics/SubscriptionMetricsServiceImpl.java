@@ -4,6 +4,7 @@ import com.springai.aibuisnessadvisor.Model.Business;
 import com.springai.aibuisnessadvisor.Model.PlatformType;
 import com.springai.aibuisnessadvisor.Model.SubscriptionMetrics;
 import com.springai.aibuisnessadvisor.Repositories.BusinessRepository;
+import com.springai.aibuisnessadvisor.Service.StripeRequestOptionsBuilder;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Subscription;
 import com.stripe.model.SubscriptionItem;
@@ -20,11 +21,12 @@ import java.time.Instant;
 @Service
 public class SubscriptionMetricsServiceImpl implements SubscriptionMetricsService {
 
-    @Autowired
-    private BusinessRepository businessRepository;
 
-    @Value("${app.mode}")
-    private String appMode;
+    private final StripeRequestOptionsBuilder stripeRequestOptionsBuilder;
+
+    public SubscriptionMetricsServiceImpl(StripeRequestOptionsBuilder stripeRequestOptionsBuilder) {
+        this.stripeRequestOptionsBuilder = stripeRequestOptionsBuilder;
+    }
 
     @Override
     public SubscriptionMetrics computeSubscriptionMetrics(
@@ -33,13 +35,13 @@ public class SubscriptionMetricsServiceImpl implements SubscriptionMetricsServic
             Instant end,
             PlatformType platformType) {
 
-        System.out.println("\n=========== STRIPE SUBSCRIPTION METRICS DEBUG ===========");
+        System.out.println("\nSTRIPE SUBSCRIPTION METRICS DEBUG ");
         System.out.println("Business ID: " + businessId);
         System.out.println("Platform: " + platformType);
         System.out.println("Start: " + start);
         System.out.println("End: " + end);
 
-        RequestOptions requestOptions = buildRequestOptions(businessId);
+        RequestOptions requestOptions = stripeRequestOptionsBuilder.createRequestOptions(businessId);
 
         Long totalSubscriptions = countTotalSubscriptions(requestOptions);
         Long activeSubscriptions = countSubscriptionsByStatus(requestOptions, SubscriptionListParams.Status.ACTIVE);
@@ -255,22 +257,5 @@ public class SubscriptionMetricsServiceImpl implements SubscriptionMetricsServic
         }
     }
 
-    private RequestOptions buildRequestOptions(Long businessId) {
-        Business business = businessRepository.findById(businessId)
-                .orElseThrow(() -> new RuntimeException("Business not found with id " + businessId));
 
-        String stripeAccountId = business.getPlatformAccounts().get(PlatformType.STRIPE);
-
-        if (stripeAccountId != null) {
-            System.out.println("Using Stripe Connected Account: " + stripeAccountId);
-            return RequestOptions.builder()
-                    .setStripeAccount(stripeAccountId)
-                    .build();
-        } else if ("dev".equals(appMode)) {
-            System.out.println("DEV MODE: Using platform Stripe key");
-            return RequestOptions.builder().build();
-        } else {
-            throw new IllegalStateException("Stripe not connected for this business");
-        }
-    }
 }
