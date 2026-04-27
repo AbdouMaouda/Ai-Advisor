@@ -33,11 +33,63 @@ function getMetricUrl(metricId, range) {
   return "/api/v1/" + ENDPOINT_MAP[metricId] + "?" + param;
 }
 
+const DEMO_SNAPSHOT = {
+  revenueMetrics: {
+    grossRevenue: 47832, netRevenue: 44100,
+    successfulCharges: 491, failedCharges: 9,
+    refundedAmount: 3732, averageDailyRevenue: 1565,
+    averageTransactionValue: 97.4,
+  },
+  customerMetrics: {
+    totalCustomers: 127, activeCustomers: 127,
+    newCustomers: 23, churnedCustomers: 2,
+    averageCustomerLifetimeValue: 1840, averageCustomerValue: 376,
+  },
+  subscriptionMetrics: {
+    activeSubscriptions: 127, newSubscriptions: 23,
+    canceledSubscriptions: 2, mrr: 12450, arr: 149400,
+    averageRevenuePerSubscription: 98, trialingSubscriptions: 8,
+  },
+  invoiceMetrics: {
+    totalInvoices: 312, paidInvoices: 298, unpaidInvoices: 14,
+    overdueInvoices: 3, totalPaid: 44100, totalOutstanding: 1850,
+    averageDaysToPayment: 4,
+  },
+  healthMetrics: { healthScore: 87 },
+};
+
+const DEMO_MD = {
+  grossRevenue: 47832, netRevenue: 44100,
+  successfulCharges: 491, failedCharges: 9,
+  refundedAmount: 3732, averageDailyRevenue: 1565,
+  averageTransactionValue: 97.4,
+  totalCustomers: 127, activeCustomers: 127,
+  newCustomers: 23, churnedCustomers: 2,
+  averageCustomerLifetimeValue: 1840, averageCustomerValue: 376,
+  activeSubscriptions: 127, newSubscriptions: 23,
+  canceledSubscriptions: 2, mrr: 12450, arr: 149400,
+  averageRevenuePerSubscription: 98, trialingSubscriptions: 8,
+  totalInvoices: 312, paidInvoices: 298, unpaidInvoices: 14,
+  overdueInvoices: 3, totalPaid: 44100, totalOutstanding: 1850,
+  averageDaysToPayment: 4,
+};
+
+const DEMO_HISTORY = [
+  { endDate: "Nov 3",  revenueMetrics: { grossRevenue: 8200  }, customerMetrics: { newCustomers: 4 }, subscriptionMetrics: { activeSubscriptions: 104 }, invoiceMetrics: { unpaidInvoices: 3 } },
+  { endDate: "Nov 10", revenueMetrics: { grossRevenue: 9800  }, customerMetrics: { newCustomers: 6 }, subscriptionMetrics: { activeSubscriptions: 108 }, invoiceMetrics: { unpaidInvoices: 2 } },
+  { endDate: "Nov 17", revenueMetrics: { grossRevenue: 11200 }, customerMetrics: { newCustomers: 5 }, subscriptionMetrics: { activeSubscriptions: 112 }, invoiceMetrics: { unpaidInvoices: 4 } },
+  { endDate: "Nov 24", revenueMetrics: { grossRevenue: 10500 }, customerMetrics: { newCustomers: 4 }, subscriptionMetrics: { activeSubscriptions: 118 }, invoiceMetrics: { unpaidInvoices: 2 } },
+  { endDate: "Dec 1",  revenueMetrics: { grossRevenue: 12800 }, customerMetrics: { newCustomers: 7 }, subscriptionMetrics: { activeSubscriptions: 121 }, invoiceMetrics: { unpaidInvoices: 3 } },
+  { endDate: "Dec 8",  revenueMetrics: { grossRevenue: 13600 }, customerMetrics: { newCustomers: 8 }, subscriptionMetrics: { activeSubscriptions: 124 }, invoiceMetrics: { unpaidInvoices: 1 } },
+  { endDate: "Dec 15", revenueMetrics: { grossRevenue: 14200 }, customerMetrics: { newCustomers: 9 }, subscriptionMetrics: { activeSubscriptions: 127 }, invoiceMetrics: { unpaidInvoices: 2 } },
+];
+
 export default function Dashboard() {
   usePageTitle("Dashboard | DataEater");
   const { isLoaded, isSignedIn } = useAuth();
   const api = useApiClient();
   const { stripeConnected, refetchStripe } = useStripe();
+  const isDemo = stripeConnected !== true;
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -108,11 +160,12 @@ export default function Dashboard() {
     api.get(url).then((data) => { setMetricData(data); });
   };
 
-  // Summary card + sidebar driven by latest snapshot
-  const rev    = snapshot?.revenueMetrics;
-  const cust   = snapshot?.customerMetrics;
-  const sub    = snapshot?.subscriptionMetrics;
-  const health = snapshot?.healthMetrics;
+  // Summary card + sidebar driven by latest snapshot (or demo data)
+  const effectiveSnapshot = isDemo ? DEMO_SNAPSHOT : snapshot;
+  const rev    = effectiveSnapshot?.revenueMetrics;
+  const cust   = effectiveSnapshot?.customerMetrics;
+  const sub    = effectiveSnapshot?.subscriptionMetrics;
+  const health = effectiveSnapshot?.healthMetrics;
 
   const totalCust   = Number(cust?.totalCustomers ?? 0);
   const churnedCust = Number(cust?.churnedCustomers ?? 0);
@@ -139,7 +192,7 @@ export default function Dashboard() {
   };
   const activeChart = chartMetricMap[selectedMetric];
 
-  const chartData = [...history]
+  const chartData = [...(isDemo ? DEMO_HISTORY : history)]
     .sort((a, b) => (a.endDate > b.endDate ? 1 : -1))
     .map((snap) => ({
       date:                snap.endDate,
@@ -151,8 +204,8 @@ export default function Dashboard() {
 
   const timeLabel = timeRange === "weekly" ? "This Week" : "This Month";
 
-  // Metric card data derives from the live-fetched metricData
-  const md = metricData;
+  // Metric card data derives from the live-fetched metricData (or demo data)
+  const md = isDemo ? DEMO_MD : metricData;
 
   // Payment success from live revenue data
   const mdSuccessful = Number(md?.successfulCharges ?? 0);
@@ -348,6 +401,20 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {isDemo && (
+          <div className="bg-amber-50 border-b border-amber-200 px-8 py-3 flex items-center justify-between">
+            <p className="text-sm text-amber-800 font-medium">
+              You're viewing demo data. Connect your Stripe account to see your real metrics.
+            </p>
+            <button
+              onClick={handleStripeConnect}
+              className="ml-6 px-4 py-1.5 bg-amber-600 text-white text-xs font-semibold rounded-lg hover:bg-amber-700 transition-colors flex-shrink-0"
+            >
+              Connect Stripe
+            </button>
+          </div>
+        )}
+
         <div className="px-8 py-8 relative">
 
           {/* Floating Vertical Metric Selector */}
@@ -527,7 +594,7 @@ export default function Dashboard() {
                       <Filter size={18} className="text-gray-600" />
                     </button>
                   </div>
-                  {stripeConnected ? (
+                  {(isDemo || stripeConnected) ? (
                     <div className="divide-y divide-gray-100">
                       {[
                         {
