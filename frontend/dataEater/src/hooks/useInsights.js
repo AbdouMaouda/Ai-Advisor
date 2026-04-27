@@ -25,7 +25,7 @@ export function useInsights() {
           console.warn("[useInsights] no token, skipping fetch");
           return null;
         }
-        return fetch("http://localhost:8080/api/ai/insights", {
+        return fetch((import.meta.env.VITE_API_BASE_URL || "http://localhost:8080") + "/api/ai/insights", {
           headers: {
             "Content-Type": "application/json",
             Authorization: "Bearer " + token,
