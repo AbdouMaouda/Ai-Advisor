@@ -18,6 +18,8 @@ public class CorsConfig {
         config.setAllowCredentials(true);
         config.addAllowedOrigin("http://localhost:5173");
         config.addAllowedOrigin("https://dataeater-bice.vercel.app");
+        config.addAllowedOrigin("https://dataeater.site");
+        config.addAllowedOrigin("https://www.dataeater.site");
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
         source.registerCorsConfiguration("/**", config);

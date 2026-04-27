@@ -49,7 +49,9 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(
                 "http://localhost:5173",
-                "https://dataeater-bice.vercel.app"
+                "https://dataeater-bice.vercel.app",
+                "https://dataeater.site",
+                "https://www.dataeater.site"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
