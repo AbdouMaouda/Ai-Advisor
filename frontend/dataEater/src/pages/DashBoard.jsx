@@ -92,10 +92,12 @@ export default function Dashboard() {
 
   const handleStripeConnect = async () => {
     try {
+      console.log("Stripe connect clicked");
       const data = await api.post("/api/stripe/create-account-link");
+      console.log("Stripe connect response:", data);
       if (data?.url) window.location.href = data.url;
-    } catch {
-      // silently ignore — user stays on the page
+    } catch (err) {
+      console.error("Stripe connect error:", err);
     }
   };
 
