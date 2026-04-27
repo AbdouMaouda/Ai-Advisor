@@ -8,6 +8,7 @@ import com.stripe.exception.StripeException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
 
@@ -18,6 +19,9 @@ import java.util.Map;
 @RequestMapping("/api/stripe")
 @RequiredArgsConstructor
 public class StripeConnectController {
+
+    @Value("${frontend.url}")
+    private String frontendUrl;
 
     @Autowired
     private final StripeConnectService stripeConnectService;
@@ -38,7 +42,7 @@ public class StripeConnectController {
     // These two remain public — Stripe redirects here after onboarding (no Clerk JWT)
     @GetMapping("/return")
     public RedirectView handleReturn(@RequestParam Long businessId) {
-        return new RedirectView("http://localhost:5173/dashboard?stripe_connected=true");
+        return new RedirectView(frontendUrl + "/dashboard?stripe_connected=true");
     }
 
     @GetMapping("/refresh")
