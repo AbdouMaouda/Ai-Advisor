@@ -84,7 +84,7 @@ export default function Home() {
                     </button>
 
                     <button className="px-8 py-4 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100 transition">
-                        View Demo
+                        Start for Free
                     </button>
 
                 </div>
