@@ -95,12 +95,24 @@ public class StripeConnectService {
         return generateAccountLink(accountId, businessId);
 
 }
-public boolean isStripeConnected(Long businessId){
+public boolean isStripeConnected(Long businessId) {
     Business business = businessRepository.findById(businessId)
             .orElseThrow(() -> new RuntimeException("Business not found: " + businessId));
 
-    return business.getPlatformAccounts() != null &&
-            business.getPlatformAccounts().containsKey(PlatformType.STRIPE);
+    if (business.getPlatformAccounts() == null ||
+            !business.getPlatformAccounts().containsKey(PlatformType.STRIPE)) {
+        return false;
+    }
+
+    String accountId = business.getPlatformAccounts().get(PlatformType.STRIPE);
+    try {
+        Stripe.apiKey = platformSecretKey;
+        Account account = Account.retrieve(accountId);
+        return Boolean.TRUE.equals(account.getDetailsSubmitted())
+                && Boolean.TRUE.equals(account.getChargesEnabled());
+    } catch (StripeException e) {
+        return false;
+    }
 }
 
 }
