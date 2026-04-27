@@ -26,10 +26,12 @@ export function useApiClient() {
   return {
     get: async (path) => {
       const token = await getToken();
+      console.log("Token retrieved:", token ? "YES - " + token.substring(0, 20) : "NULL");
       return authFetch(path, token);
     },
     post: async (path, body) => {
       const token = await getToken();
+      console.log("Token retrieved:", token ? "YES - " + token.substring(0, 20) : "NULL");
       return authFetch(path, token, {
         method: "POST",
         body: body != null ? JSON.stringify(body) : undefined,
@@ -37,6 +39,7 @@ export function useApiClient() {
     },
     del: async (path) => {
       const token = await getToken();
+      console.log("Token retrieved:", token ? "YES - " + token.substring(0, 20) : "NULL");
       return authFetch(path, token, { method: "DELETE" });
     },
   };
