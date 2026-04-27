@@ -1,7 +1,14 @@
 import { useState } from "react";
-import {Link} from "react-router-dom";
+import { Link } from "react-router-dom";
+import { useAuth, UserButton } from "@clerk/clerk-react";
 
 export default function HomeNavbar() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  const scrollTo = (id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <nav className="flex justify-between items-center px-12 py-6">
 
@@ -10,31 +17,24 @@ export default function HomeNavbar() {
       </div>
 
       <div className="flex gap-8 text-gray-700">
-
-        <Link to="/product" className="hover:text-black">
-          Product
-        </Link>
-
-        <Link to="/pricing" className="hover:text-black">
-          Pricing
-        </Link>
-
-        <Link to="/docs" className="hover:text-black">
-          Docs
-        </Link>
-
+        <button onClick={() => scrollTo("solutions")} className="hover:text-black transition-colors">Solutions</button>
+        <button onClick={() => scrollTo("how-it-works")} className="hover:text-black transition-colors">How it works</button>
+        <button onClick={() => scrollTo("faq")} className="hover:text-black transition-colors">FAQ</button>
       </div>
 
-      <div className="flex gap-4">
-
-        <button className="text-gray-700 hover:text-black border border-gray-300 px-5 py-2 rounded-full transition">
-          Login
-        </button>
-
-        <button className="bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">
-          Get Started
-        </button>
-
+      <div className="flex gap-4 items-center">
+        {isLoaded && isSignedIn ? (
+          <UserButton afterSignOutUrl="/" />
+        ) : (
+          <>
+            <Link to="/sign-in" className="text-gray-700 hover:text-black border border-gray-300 px-5 py-2 rounded-full transition">
+              Login
+            </Link>
+            <Link to="/sign-up" className="bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">
+              Get Started
+            </Link>
+          </>
+        )}
       </div>
 
     </nav>

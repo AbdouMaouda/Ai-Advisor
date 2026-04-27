@@ -1,7 +1,6 @@
 package com.springai.aibuisnessadvisor.Auth;
 
 import com.springai.aibuisnessadvisor.Model.Business;
-import com.springai.aibuisnessadvisor.Model.PlatformAuth;
 import com.springai.aibuisnessadvisor.Model.PlatformType;
 import com.springai.aibuisnessadvisor.Repositories.BusinessRepository;
 import com.stripe.Stripe;
@@ -52,7 +51,6 @@ public class StripeConnectService {
         businessRepository.save(business);
 
         return accountId;
-
 
     }
 

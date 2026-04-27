@@ -3,11 +3,11 @@ import {
   Newspaper,
   Brain,
   Zap,
-  MessageCircle,
   Settings
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
+import { UserButton } from "@clerk/clerk-react";
 
 export default function Sidebar() {
   return (
@@ -70,17 +70,24 @@ export default function Sidebar() {
           </h4>
           <div className="space-y-1">
             <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white hover:shadow-sm transition-all text-gray-700 hover:text-gray-900">
-              <MessageCircle size={20} />
-              <span className="font-medium">Ask DataEater</span>
-            </button>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white hover:shadow-sm transition-all text-gray-700 hover:text-gray-900">
               <Settings size={20} />
-              <span className="font-medium">Settings</span>
+              <Link to="/settings/api-key" className="font-medium">
+                Settings
+              </Link>
             </button>
           </div>
         </div>
 
       </nav>
+
+      {/* User / logout */}
+      <div className="pt-4 border-t border-gray-200">
+        <div className="flex items-center gap-3 px-3 py-2">
+          <UserButton afterSignOutUrl="/" />
+          <span className="text-sm font-medium text-gray-600">Account</span>
+        </div>
+      </div>
+
     </div>
   );
 }

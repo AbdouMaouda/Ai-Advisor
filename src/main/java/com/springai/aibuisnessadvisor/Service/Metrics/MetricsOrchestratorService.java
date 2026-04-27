@@ -7,11 +7,12 @@ import com.springai.aibuisnessadvisor.Repositories.BusinessMetricsRepository;
 import com.springai.aibuisnessadvisor.Repositories.BusinessRepository;
 import com.springai.aibuisnessadvisor.Repositories.ProductPerformanceRepository;
 import com.springai.aibuisnessadvisor.Service.AI.AIInsightsService;
-import com.springai.aibuisnessadvisor.Service.AI.AIService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -203,7 +204,7 @@ public class MetricsOrchestratorService {
             );
 
             try {
-                HealthInsights insights = aiInsightsService.AIInsights(metricsForAI);
+                HealthInsights insights = aiInsightsService.AIInsights(metricsForAI, businessId);
 
                 healthMetrics.setStrengths(insights.getStrengths());
                 healthMetrics.setWarnings(insights.getWarnings());
@@ -266,19 +267,22 @@ public class MetricsOrchestratorService {
     }
 
     /**
-     * Get the latest saved snapshot for a business (CRITICAL FOR GROWTH IN MVP SAAS)
+     * Returns the snapshot with the highest health score for this business.
      */
     public BusinessMetrics getLatestSnapshot(Long businessId) {
-        System.out.println("Fetching latest snapshot (any platform) for business: " + businessId);
+        System.out.println("Fetching highest-health-score snapshot for business: " + businessId);
 
         BusinessMetrics snapshot = businessMetricsRepository
-                .findFirstByBusiness_IdOrderByEndDateDesc(businessId)
+                .findTopByHealthScore(businessId, PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
                 .orElse(null);
 
         if (snapshot == null) {
-            System.out.println("Latest Snapshot = NULL");
+            System.out.println("No snapshot found for business: " + businessId);
         } else {
-            System.out.println("Latest Snapshot ID: " + snapshot.getId());
+            System.out.println("Snapshot ID: " + snapshot.getId()
+                    + " | healthScore: " + snapshot.getHealthMetrics().getHealthScore());
         }
 
         return snapshot;

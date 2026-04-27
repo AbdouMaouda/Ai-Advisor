@@ -55,7 +55,10 @@ public class Business {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @ElementCollection //Collection of simple values
+    @Column(name = "clerk_user_id", unique = true)
+    private String clerkUserId;
+
+    @ElementCollection
     @CollectionTable(
             name = "business_platform_tokens",
             joinColumns = @JoinColumn(name = "business_id")
