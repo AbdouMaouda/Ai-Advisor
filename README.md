@@ -29,7 +29,7 @@ An AI-powered business analytics platform that connects to your Stripe account a
 | Database | PostgreSQL |
 | Auth | Clerk (frontend SDK + JWT validation) |
 | Payments | Stripe Connect (Express accounts) |
-| AI | Anthropic Claude API |
+| AI | Anthropic Claude API,Open AI API,Ollama |
 | Deployment | Vercel (frontend), Docker (backend) |
 
 ---
