@@ -34,12 +34,6 @@ An AI-powered business analytics platform that connects to your Stripe account a
 
 ---
 
-## Screenshots
-
-> _Coming soon_
-
----
-
 ## Local Setup
 
 ### Prerequisites
